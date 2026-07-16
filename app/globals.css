@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Jot color palette - matching the working prototype exactly
+     Clean, minimal, neutral tones with subtle warmth */
+
+  /* Base colors */
+  --paper: #f1f0ea; /* main background - warm off-white */
+  --paper-raised: #ffffff; /* raised elements like cards */
+  --ink: #1b2521; /* primary text - dark with subtle green undertone */
+  --ink-soft: #5b655f; /* secondary text */
+  --line: #dedbcf; /* borders and dividers - warm neutral */
+
+  /* Accent colors */
+  --accent: #3d6b66; /* teal - primary interactive color */
+  --accent-soft: #e4ecea; /* soft teal background */
+  --amber: #efae24; /* amber - for unsorted badge */
+  --amber-soft: #fbf0d9; /* soft amber background */
+  --purple: #6b4f8a; /* purple - for general notes */
+  --purple-soft: #efe7f5; /* soft purple background */
+
+  /* Design tokens */
+  --radius: 10px;
+  --shadow-card:
+    0 1px 2px rgba(27, 37, 33, 0.06), 0 1px 1px rgba(27, 37, 33, 0.04);
+  --shadow-pop:
+    0 12px 32px rgba(27, 37, 33, 0.16), 0 2px 8px rgba(27, 37, 33, 0.08);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family:
+    var(--font-ibm-plex-sans),
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* Selection highlight */
+::selection {
+  background: var(--amber-soft);
+}
+
+/* Smooth animations */
+@keyframes slideUp {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
