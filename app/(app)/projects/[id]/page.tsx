@@ -8,6 +8,7 @@ import { FolderOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import type { Note, Project, Meeting, NoteTopic } from "@/lib/types";
+import { AnimatePresence } from "framer-motion";
 
 /**
  * Project detail page - shows all notes for a specific project.
@@ -166,9 +167,11 @@ export default function ProjectPage() {
                           )}
                         </h3>
                         <div className="space-y-4">
-                          {meetingNotesFiltered.map((note) => (
-                            <NoteCard key={note.id} note={note} />
-                          ))}
+                          <AnimatePresence>
+                            {meetingNotesFiltered.map((note) => (
+                              <NoteCard key={note.id} note={note} />
+                            ))}
+                          </AnimatePresence>
                         </div>
                       </div>
                     );
@@ -208,9 +211,11 @@ export default function ProjectPage() {
                           {topic.name}
                         </h3>
                         <div className="space-y-4">
-                          {topicNotesFiltered.map((note) => (
-                            <NoteCard key={note.id} note={note} />
-                          ))}
+                          <AnimatePresence>
+                            {topicNotesFiltered.map((note) => (
+                              <NoteCard key={note.id} note={note} />
+                            ))}
+                          </AnimatePresence>
                         </div>
                       </div>
                     );

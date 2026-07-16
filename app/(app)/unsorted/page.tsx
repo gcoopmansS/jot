@@ -7,6 +7,7 @@ import { LoadingPage } from "@/components/ui/loading";
 import { Inbox } from "lucide-react";
 import { Note } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence } from "framer-motion";
 
 /**
  * Unsorted notes page - the inbox for notes that haven't been filed yet.
@@ -60,9 +61,11 @@ export default function UnsortedPage() {
         {!isLoading && !error && notes && notes.length > 0 && (
           <div className="max-w-3xl mx-auto">
             <div className="space-y-4">
-              {notes.map((note) => (
-                <NoteCard key={note.id} note={note} />
-              ))}
+              <AnimatePresence>
+                {notes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         )}

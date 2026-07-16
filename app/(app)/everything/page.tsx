@@ -7,6 +7,7 @@ import { LoadingPage } from "@/components/ui/loading";
 import { FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Note } from "@/lib/types";
+import { AnimatePresence } from "framer-motion";
 
 /**
  * Everything page - shows all notes across all projects.
@@ -46,9 +47,11 @@ export default function EverythingPage() {
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">
-            {notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
-            ))}
+            <AnimatePresence>
+              {notes.map((note) => (
+                <NoteCard key={note.id} note={note} />
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>

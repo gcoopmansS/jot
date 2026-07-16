@@ -9,6 +9,7 @@ import { Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import type { Note, Meeting } from "@/lib/types";
+import { AnimatePresence } from "framer-motion";
 
 /**
  * Meeting detail page - shows all notes for a specific meeting.
@@ -115,9 +116,11 @@ export default function MeetingPage() {
             />
           ) : (
             <div className="space-y-4">
-              {notes.map((note) => (
-                <NoteCard key={note.id} note={note} />
-              ))}
+              <AnimatePresence>
+                {notes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </div>

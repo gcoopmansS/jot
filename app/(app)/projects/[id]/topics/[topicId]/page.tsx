@@ -8,6 +8,7 @@ import { BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import type { Note, NoteTopic } from "@/lib/types";
+import { AnimatePresence } from "framer-motion";
 
 /**
  * Topic detail page - shows all notes for a specific topic.
@@ -90,9 +91,11 @@ export default function TopicPage() {
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">
-            {notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
-            ))}
+            <AnimatePresence>
+              {notes.map((note) => (
+                <NoteCard key={note.id} note={note} />
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>

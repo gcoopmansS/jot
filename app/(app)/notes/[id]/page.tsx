@@ -169,7 +169,7 @@ export default function NotePage() {
         </div>
         <button
           onClick={handleClose}
-          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)]"
+          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)] cursor-pointer"
           aria-label="Close"
         >
           <X className="h-5 w-5" />

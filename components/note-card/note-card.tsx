@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 /**
  * NoteCard component - displays a single note in a list view.
@@ -45,7 +46,7 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate all note-related queries to refresh the UI
+      // Invalidate queries immediately - AnimatePresence will handle the exit animation
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["unsorted-notes"] });
       queryClient.invalidateQueries({ queryKey: ["meeting-notes"] });
@@ -83,18 +84,37 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
   };
 
   const confirmDelete = () => {
+    setShowDeleteDialog(false);
     deleteMutation.mutate(note.id);
   };
 
   return (
     <>
-      <div
+      <motion.div
+        layout
+        exit={{
+          opacity: 0,
+          scale: 0.95,
+          height: 0,
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+        }}
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        transition={{
+          duration: 0.3,
+          ease: [0.2, 0.8, 0.2, 1],
+          layout: {
+            duration: 0.3,
+            ease: [0.2, 0.8, 0.2, 1],
+          },
+        }}
         className={cn(
-          "relative cursor-pointer rounded-[var(--radius)] border bg-[var(--paper-raised)] p-6 transition-colors",
-          "border-[var(--line)] hover:border-[var(--ink-soft)]",
+          "relative cursor-pointer rounded-[var(--radius)] border bg-[var(--paper-raised)] p-6 transition-colors overflow-hidden",
+          "border-[var(--line)] hover:border-[var(--accent)]",
         )}
         style={{ boxShadow: "var(--shadow-card)" }}
       >
@@ -117,7 +137,7 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
               <button
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="flex h-6 w-6 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--paper)] disabled:opacity-50"
+                className="flex h-6 w-6 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--paper)] disabled:opacity-50 cursor-pointer"
                 aria-label="Delete note"
               >
                 <Trash2 className="h-4 w-4" />
@@ -136,7 +156,7 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
           {previewText}
           {isLong && "..."}
         </p>
-      </div>
+      </motion.div>
 
       {/* Delete confirmation dialog using Radix */}
       <Dialog.Root open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
