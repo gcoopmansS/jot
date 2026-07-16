@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCaptureOverlay } from "@/lib/capture-context";
+import { saveDraft, clearDraft } from "@/lib/draft-storage";
+import { generateNoteId, retryWithBackoff } from "@/lib/retry";
+import { pendingSavesManager } from "@/lib/pending-saves";
 import { CategorizeBar } from "./categorize-bar";
 import { Kbd } from "@/components/ui/kbd";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -16,15 +19,87 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
  *
  * Uses Framer Motion for fade-in/scale animation (one of the two deliberate animations).
  * Textarea uses Source Serif 4 to feel distinct from UI chrome.
+ *
+ * RELIABILITY LAYERS:
+ * - Layer 1: Drafts auto-saved to localStorage every 500ms (before any server save)
+ * - Layer 2: Client-side UUID generation + retry with exponential backoff + network-aware background retries
  */
 export function CaptureOverlay() {
-  const { isOpen, closeCapture } = useCaptureOverlay();
+  const { isOpen, initialText, initialId, closeCapture } = useCaptureOverlay();
   const queryClient = useQueryClient();
+  const [noteId, setNoteId] = useState<string>("");
   const [text, setText] = useState("");
   const [showCategorize, setShowCategorize] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "failed" | "retrying"
+  >("idle");
+  const [saveError, setSaveError] = useState<string>("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const initializedRef = useRef(false);
+
+  // Generate or restore note ID when overlay opens
+  useEffect(() => {
+    if (isOpen && !noteId) {
+      // Use the restored ID if available, otherwise generate a new one
+      const id = initialId || generateNoteId();
+      setNoteId(id);
+    }
+  }, [isOpen, initialId, noteId]);
+
+  // Debounced draft save: save to localStorage 500ms after user stops typing
+  const debouncedSaveDraft = useCallback((id: string, value: string) => {
+    // Clear any existing timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    // Set a new timer to save after 500ms
+    saveTimerRef.current = setTimeout(() => {
+      if (value.trim()) {
+        saveDraft(id, value);
+      }
+    }, 500);
+  }, []);
+
+  // Save draft whenever text changes
+  useEffect(() => {
+    if (isOpen && text && noteId) {
+      debouncedSaveDraft(noteId, text);
+    }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [text, isOpen, noteId, debouncedSaveDraft]);
+
+  // Listen for save status changes from the pending saves manager
+  useEffect(() => {
+    if (!noteId) return;
+
+    const unsubscribe = pendingSavesManager.addListener((status) => {
+      if (status.id === noteId) {
+        setSaveStatus(status.state);
+        if (status.error) {
+          setSaveError(status.error);
+        }
+
+        // If background retry succeeded, close the overlay
+        if (status.state === "saved") {
+          clearDraft();
+          queryClient.invalidateQueries({ queryKey: ["notes"] });
+          queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+          closeCapture();
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [noteId, queryClient, closeCapture]);
 
   // Focus textarea when overlay opens or when returning from categorize bar
   useEffect(() => {
@@ -49,15 +124,46 @@ export function CaptureOverlay() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, showCategorize]);
 
-  // Reset state when overlay closes
+  // Reset state when overlay closes OR initialize text when it opens with initialText
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      // Opening
+      if (initialText && !initializedRef.current) {
+        // Initialize with draft text (only once per open)
+        setText(initialText);
+        initializedRef.current = true;
+      }
+    } else {
+      // Closing - reset everything
       setText("");
+      setNoteId("");
       setShowCategorize(false);
-      setIsSaving(false);
+      setSaveStatus("idle");
+      setSaveError("");
       setShowDiscardConfirm(false);
+      initializedRef.current = false;
     }
-  }, [isOpen]);
+  }, [isOpen, initialText]);
+
+  // Warn before leaving when there are unsaved changes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Show warning if there's text that hasn't been confirmed saved
+      // Don't warn if: no text, or save succeeded
+      const hasUnsavedChanges = text.trim() && saveStatus !== "saved";
+
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        // Modern browsers ignore the custom message and show their own
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isOpen, text, saveStatus]);
 
   // Handle discard - separate from the finish/save flow
   const handleDiscardClick = () => {
@@ -71,6 +177,8 @@ export function CaptureOverlay() {
   };
 
   const handleDiscardConfirm = () => {
+    // Clear the draft when explicitly discarding
+    clearDraft();
     // Text will be thrown away when overlay closes (reset effect above)
     closeCapture();
   };
@@ -81,88 +189,166 @@ export function CaptureOverlay() {
     // Textarea will be re-focused by the existing useEffect
   };
 
-  // Save the note with categorization
+  // Save the note with categorization (with automatic retry)
   const handleSave = async (data: {
     type: "meeting" | "general";
     projectId?: string;
     topicId?: string;
     meetingId?: string;
+    isUnsorted?: boolean;
   }) => {
-    if (!text.trim()) {
+    if (!text.trim() || !noteId) {
       closeCapture();
       return;
     }
 
-    setIsSaving(true);
+    setSaveStatus("saving");
 
     try {
-      const response = await fetch("/api/notes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // If categorization is incomplete (e.g., offline), treat as unsorted
+      const shouldBeUnsorted =
+        data.isUnsorted ||
+        (data.type === "meeting" && !data.meetingId) ||
+        (data.type === "general" && !data.topicId);
+
+      // Attempt save with automatic retry (3 attempts with exponential backoff)
+      await retryWithBackoff(
+        async () => {
+          const response = await fetch("/api/notes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: noteId,
+              text: text.trim(),
+              // Keep the type the user selected, but clear the IDs if unsorted
+              type: data.type,
+              meeting_id: shouldBeUnsorted ? null : data.meetingId || null,
+              topic_id: shouldBeUnsorted ? null : data.topicId || null,
+              is_unsorted: shouldBeUnsorted,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to save note");
+          }
+
+          return response.json();
         },
-        body: JSON.stringify({
-          text: text.trim(),
-          type: data.type,
-          meeting_id: data.meetingId || null,
-          topic_id: data.topicId || null,
-          is_unsorted: false, // User explicitly categorized this
-        }),
-      });
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            console.log(
+              `Retry attempt ${attempt} for note ${noteId}:`,
+              error.message,
+            );
+            setSaveStatus("retrying");
+          },
+        },
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to save note");
-      }
-
-      // Invalidate all relevant queries to refresh sidebar and lists
+      // Success! Clear the draft and close
+      clearDraft();
+      setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
-
-      // Success! Close the overlay
       closeCapture();
     } catch (error) {
-      console.error("Error saving note:", error);
-      alert("Failed to save note. Please try again.");
-      setIsSaving(false);
+      // All retries failed - add to pending queue for background retry
+      console.error("Failed to save note after retries:", error);
+      setSaveStatus("failed");
+      setSaveError(error instanceof Error ? error.message : "Unknown error");
+
+      // Use the same validation: if categorization is incomplete, mark as unsorted
+      const shouldBeUnsorted =
+        data.isUnsorted ||
+        (data.type === "meeting" && !data.meetingId) ||
+        (data.type === "general" && !data.topicId);
+
+      pendingSavesManager.addPending({
+        id: noteId,
+        text: text.trim(),
+        type: data.type, // Keep the type the user selected
+        meetingId: shouldBeUnsorted ? undefined : data.meetingId,
+        topicId: shouldBeUnsorted ? undefined : data.topicId,
+        isUnsorted: shouldBeUnsorted,
+        timestamp: Date.now(),
+        attemptCount: 3,
+      });
+
+      // Don't close or clear the draft - keep it for recovery
+      // Status indicator will show "Couldn't save" message
+      // User can manually close when ready, or wait for background retry
     }
   };
 
-  // Save as unsorted
+  // Save as unsorted (with automatic retry)
   const handleSkip = async () => {
-    if (!text.trim()) {
+    if (!text.trim() || !noteId) {
       closeCapture();
       return;
     }
 
-    setIsSaving(true);
+    setSaveStatus("saving");
 
     try {
-      const response = await fetch("/api/notes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // Attempt save with automatic retry (3 attempts with exponential backoff)
+      await retryWithBackoff(
+        async () => {
+          const response = await fetch("/api/notes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: noteId,
+              text: text.trim(),
+              type: "general",
+              is_unsorted: true,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to save note");
+          }
+
+          return response.json();
         },
-        body: JSON.stringify({
-          text: text.trim(),
-          type: "general", // Default to general for unsorted notes
-          is_unsorted: true,
-        }),
-      });
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            console.log(
+              `Retry attempt ${attempt} for note ${noteId}:`,
+              error.message,
+            );
+            setSaveStatus("retrying");
+          },
+        },
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to save note");
-      }
-
-      // Invalidate all relevant queries to refresh sidebar and lists
+      // Success! Clear the draft and close
+      clearDraft();
+      setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
-
-      // Success! Close the overlay
       closeCapture();
     } catch (error) {
-      console.error("Error saving note:", error);
-      alert("Failed to save note. Please try again.");
-      setIsSaving(false);
+      // All retries failed - add to pending queue for background retry
+      console.error("Failed to save note after retries:", error);
+      setSaveStatus("failed");
+      setSaveError(error instanceof Error ? error.message : "Unknown error");
+
+      pendingSavesManager.addPending({
+        id: noteId,
+        text: text.trim(),
+        type: "general",
+        isUnsorted: true,
+        timestamp: Date.now(),
+        attemptCount: 3,
+      });
+
+      // Don't close or clear the draft - keep it for recovery
+      // Status indicator will show "Couldn't save" message
+      // User can manually close when ready, or wait for background retry
     }
   };
 
@@ -217,7 +403,11 @@ export function CaptureOverlay() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Start typing — figure out where it goes later…"
-                disabled={showCategorize || isSaving}
+                disabled={
+                  showCategorize ||
+                  saveStatus === "saving" ||
+                  saveStatus === "retrying"
+                }
                 className={`h-full w-full max-w-3xl resize-none border-none bg-transparent text-xl leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-soft)] disabled:opacity-50 ${
                   showCategorize ? "pointer-events-none" : ""
                 }`}
@@ -228,14 +418,47 @@ export function CaptureOverlay() {
               />
             </div>
 
-            {/* Saving indicator */}
-            {isSaving && (
+            {/* Save status indicator */}
+            {(saveStatus === "saving" ||
+              saveStatus === "retrying" ||
+              saveStatus === "failed") && (
               <div className="border-t border-[var(--line)] bg-[var(--paper)] px-10 py-4">
                 <div
-                  className="text-sm text-[var(--ink-soft)]"
+                  className="flex items-center justify-between text-sm"
                   style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                 >
-                  Saving...
+                  <div>
+                    {saveStatus === "saving" && (
+                      <span className="text-[var(--ink-soft)]">Saving...</span>
+                    )}
+                    {saveStatus === "retrying" && (
+                      <span className="text-[var(--amber)]">
+                        ⚠️ Connection issue — retrying save...
+                      </span>
+                    )}
+                    {saveStatus === "failed" && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[var(--ink)] font-medium">
+                          ⚠️ Couldn't save right now
+                        </span>
+                        <span className="text-[var(--ink-soft)] text-xs">
+                          Your note is saved locally and will automatically sync
+                          when your connection returns.
+                          {saveError && (
+                            <span className="block">Error: {saveError}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {saveStatus === "failed" && (
+                    <button
+                      onClick={closeCapture}
+                      className="text-sm text-[var(--ink-soft)] underline transition-colors hover:text-[var(--ink)]"
+                    >
+                      Close
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -257,7 +480,12 @@ export function CaptureOverlay() {
 
       {/* Categorize bar (slides up from bottom) */}
       <CategorizeBar
-        isOpen={showCategorize && !isSaving}
+        isOpen={
+          showCategorize &&
+          saveStatus !== "saving" &&
+          saveStatus !== "retrying" &&
+          saveStatus !== "failed"
+        }
         onSave={handleSave}
         onSkip={handleSkip}
         onBack={handleBack}

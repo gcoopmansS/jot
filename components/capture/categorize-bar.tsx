@@ -26,6 +26,7 @@ type CategorizeBarProps = {
     projectId?: string;
     topicId?: string;
     meetingId?: string;
+    isUnsorted?: boolean;
   }) => void;
   onSkip: () => void;
   onBack: () => void;
@@ -169,11 +170,18 @@ export function CategorizeBar({
       }
     }
 
+    // Validate: type must match ID (prevent constraint violation)
+    // If type is "meeting" but no meetingId, or "general" but no topicId,
+    // treat as unsorted rather than sending invalid data
+    const isValidCategorization =
+      (type === "meeting" && meetingId) || (type === "general" && topicId);
+
     onSave({
       type: type || "general",
       projectId,
       topicId,
       meetingId,
+      isUnsorted: !isValidCategorization, // Mark as unsorted if categorization is incomplete
     });
   };
 

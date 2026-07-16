@@ -5,10 +5,12 @@ import { CreateNoteInput } from "@/lib/types";
 /**
  * POST /api/notes
  *
- * Creates a new note in Supabase.
+ * Creates a new note in Supabase, or updates if a note with the given ID already exists.
+ * Supports upsert for reliable retries with client-generated IDs.
  *
  * Request body:
  * {
+ *   id?: string,              // Optional client-generated UUID (for retries)
  *   text: string,
  *   type: 'meeting' | 'general',
  *   meeting_id?: string,
@@ -29,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the request body
-    const body: CreateNoteInput = await request.json();
+    const body: CreateNoteInput & { id?: string } = await request.json();
 
     // Validate required fields
     if (!body.text || !body.type) {
@@ -47,16 +49,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert the note into Supabase
+    // Prepare the note data
+    const noteData = {
+      ...(body.id && { id: body.id }), // Include client ID if provided
+      user_id: user.id,
+      text: body.text,
+      type: body.type,
+      meeting_id: body.meeting_id || null,
+      topic_id: body.topic_id || null,
+      is_unsorted: body.is_unsorted || false,
+    };
+
+    // Use upsert to handle retries gracefully
+    // If a note with this ID already exists, it will be updated (idempotent)
     const { data, error } = await supabase
       .from("notes")
-      .insert({
-        user_id: user.id,
-        text: body.text,
-        type: body.type,
-        meeting_id: body.meeting_id || null,
-        topic_id: body.topic_id || null,
-        is_unsorted: body.is_unsorted !== false, // Default to true if not specified
+      .upsert(noteData, {
+        onConflict: "id",
       })
       .select()
       .single();

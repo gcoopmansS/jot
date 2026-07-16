@@ -33,7 +33,7 @@ export type NoteTopic = {
  * A single note. Can be a meeting note or a general note.
  * - meeting note: type='meeting', meeting_id is set
  * - general note: type='general', topic_id may be set
- * - unsorted: is_unsorted=true, neither meeting_id nor topic_id is set
+ * - unsorted: is_unsorted=true, type is still set but IDs are null
  */
 export type Note = {
   id: string;

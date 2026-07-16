@@ -49,7 +49,11 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
         </div>
 
         {/* New note button */}
-        <Button onClick={openCapture} variant="primary" className="gap-2">
+        <Button
+          onClick={() => openCapture()}
+          variant="primary"
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" />
           New note
           <Kbd>⌘⏎</Kbd>
