@@ -2,6 +2,9 @@
 
 import { AppHeader } from "@/components/app-header/app-header";
 import { NoteCard } from "@/components/note-card/note-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingPage } from "@/components/ui/loading";
+import { Inbox } from "lucide-react";
 import { Note } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 
@@ -33,11 +36,7 @@ export default function UnsortedPage() {
       <AppHeader title="Unsorted" />
       <div className="flex-1 px-10 py-6">
         {/* Loading state */}
-        {isLoading && (
-          <div className="text-sm text-[#5B655F] text-center mt-12">
-            Loading...
-          </div>
-        )}
+        {isLoading && <LoadingPage />}
 
         {/* Error state */}
         {error && (
@@ -48,8 +47,12 @@ export default function UnsortedPage() {
 
         {/* Empty state */}
         {!isLoading && !error && notes && notes.length === 0 && (
-          <div className="text-sm text-[#5B655F] text-center mt-12">
-            No unsorted notes. Everything is filed!
+          <div className="max-w-3xl mx-auto">
+            <EmptyState
+              icon={Inbox}
+              title="All caught up"
+              description="No unsorted notes — everything is filed. New notes will appear here when you skip categorizing."
+            />
           </div>
         )}
 

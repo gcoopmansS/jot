@@ -2,6 +2,9 @@
 
 import { AppHeader } from "@/components/app-header/app-header";
 import { NoteCard } from "@/components/note-card/note-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingPage } from "@/components/ui/loading";
+import { FolderOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import type { Note, Project, Meeting, NoteTopic } from "@/lib/types";
@@ -85,9 +88,7 @@ export default function ProjectPage() {
       <>
         <AppHeader title="Loading..." />
         <div className="flex-1 px-10 py-6">
-          <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-            Loading project...
-          </p>
+          <LoadingPage />
         </div>
       </>
     );
@@ -115,15 +116,14 @@ export default function ProjectPage() {
       <AppHeader title={project.name} />
       <div className="flex-1 px-10 py-6">
         {notesLoading ? (
-          <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-            Loading notes...
-          </p>
+          <LoadingPage />
         ) : notes.length === 0 ? (
-          <div
-            className="text-sm text-center mt-12"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            No notes in this project yet. Create a note and file it here.
+          <div className="max-w-3xl mx-auto">
+            <EmptyState
+              icon={FolderOpen}
+              title="No notes in this project yet"
+              description={`Create a note and file it to "${project.name}" to see it here.`}
+            />
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-8">

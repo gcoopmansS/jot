@@ -2,19 +2,25 @@
 
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Note } from "@/lib/types";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
  * NoteCard component - displays a single note in a list view.
  *
  * Shows:
- * - Type badge (MEETING or GENERAL)
- * - Timestamp
- * - Preview of note text
- * - Subtle visual hierarchy following the design language
+ * - Type badge (MEETING or GENERAL) using Badge component
+ * - Timestamp in uppercase IBM Plex Mono format (JAN 15, 2026)
+ * - Preview text in Source Serif 4 (signals "this is note content")
+ * - Delete button (Trash2 icon, visible on hover)
  *
- * Clicking the card navigates to the note detail page for editing.
+ * Hover state: border color shifts from --line to --ink-soft
+ * Click: navigates to note detail page for editing
  */
 interface NoteCardProps {
   note: Note;
@@ -25,7 +31,7 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Mutation for deleting a note
   const deleteMutation = useMutation({
@@ -44,15 +50,20 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
       queryClient.invalidateQueries({ queryKey: ["unsorted-notes"] });
       queryClient.invalidateQueries({ queryKey: ["meeting-notes"] });
       queryClient.invalidateQueries({ queryKey: ["topic-notes"] });
-      setShowDeleteModal(false);
+      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+      setShowDeleteDialog(false);
     },
   });
-  // Format the date nicely
-  const formattedDate = new Date(note.created_at).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+
+  // Format the date in uppercase format: JAN 15, 2026
+  const formattedDate = new Date(note.created_at)
+    .toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+    .replace(",", "")
+    .toUpperCase();
 
   // Get first line or first ~150 chars for preview
   const previewText = note.text.split("\n")[0].slice(0, 150);
@@ -68,15 +79,11 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the card click
-    setShowDeleteModal(true);
+    setShowDeleteDialog(true);
   };
 
   const confirmDelete = () => {
     deleteMutation.mutate(note.id);
-  };
-
-  const cancelDelete = () => {
-    setShowDeleteModal(false);
   };
 
   return (
@@ -85,131 +92,91 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className="bg-white border border-[#DEDBCF] rounded-[10px] p-6 transition-colors hover:border-[#5B655F] cursor-pointer relative"
+        className={cn(
+          "relative cursor-pointer rounded-[var(--radius)] border bg-[var(--paper-raised)] p-6 transition-colors",
+          "border-[var(--line)] hover:border-[var(--ink-soft)]",
+        )}
         style={{ boxShadow: "var(--shadow-card)" }}
       >
-      {/* Header: Type badge + timestamp + delete button */}
-      <div className="flex items-center justify-between mb-3">
-        <span
-          className={`px-2 py-1 text-xs font-semibold rounded uppercase tracking-wide ${
-            note.type === "meeting"
-              ? "bg-[#3D6B66] text-white"
-              : "bg-[#6B4F8A] text-white"
-          }`}
-        >
-          {note.type}
-        </span>
-        <div className="flex items-center gap-2">
-          <span
-            className="text-xs uppercase tracking-wide"
-            style={{
-              fontFamily: "var(--font-ibm-plex-mono)",
-              color: "var(--ink-soft)",
-            }}
-          >
-            {formattedDate}
-          </span>
-          {/* Delete button - appears on hover */}
-          {isHovered && (
-            <button
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className="w-5 h-5 flex items-center justify-center rounded transition-colors hover:bg-[#F1F0EA] disabled:opacity-50 cursor-pointer"
-              style={{ color: "var(--ink-soft)" }}
-              aria-label="Delete note"
-            >
-              {/* Trash can icon */}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 16 16"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M3 4H13M5.5 4V3C5.5 2.44772 5.94772 2 6.5 2H9.5C10.0523 2 10.5 2.44772 10.5 3V4M6.5 7V11M9.5 7V11M4.5 4L5 13C5 13.5523 5.44772 14 6 14H10C10.5523 14 11 13.5523 11 13L11.5 4"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Note preview text - in Source Serif 4 to signal this is content */}
-      <p
-        className="text-base leading-relaxed"
-        style={{
-          fontFamily: "var(--font-source-serif)",
-          color: "var(--ink)",
-        }}
-      >
-        {previewText}
-        {isLong && "..."}
-      </p>
-      </div>
-
-      {/* Delete confirmation modal */}
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 bg-black/20 flex items-center justify-center z-50"
-          onClick={cancelDelete}
-        >
-          <div
-            className="bg-white rounded-[10px] p-6 max-w-sm w-full mx-4"
-            style={{ boxShadow: "var(--shadow-pop)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              className="text-lg font-semibold mb-2"
+        {/* Header: Type badge + timestamp + delete button */}
+        <div className="mb-3 flex items-center justify-between">
+          <Badge variant={note.type === "meeting" ? "meeting" : "general"}>
+            {note.type}
+          </Badge>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
               style={{
-                fontFamily: "var(--font-space-grotesk)",
-                color: "var(--ink)",
+                fontFamily: "var(--font-ibm-plex-mono)",
               }}
+            >
+              {formattedDate}
+            </span>
+            {/* Delete button - appears on hover */}
+            {isHovered && (
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="flex h-6 w-6 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--paper)] disabled:opacity-50"
+                aria-label="Delete note"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Note preview text - in Source Serif 4 to signal this is content */}
+        <p
+          className="text-base leading-relaxed text-[var(--ink)]"
+          style={{
+            fontFamily: "var(--font-source-serif)",
+          }}
+        >
+          {previewText}
+          {isLong && "..."}
+        </p>
+      </div>
+
+      {/* Delete confirmation dialog using Radix */}
+      <Dialog.Root open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius)] bg-[var(--paper-raised)] p-6"
+            style={{ boxShadow: "var(--shadow-pop)" }}
+          >
+            <Dialog.Title
+              className="mb-2 text-lg font-semibold text-[var(--ink)]"
+              style={{ fontFamily: "var(--font-space-grotesk)" }}
             >
               Delete note?
-            </h3>
-            <p
-              className="text-sm mb-6"
-              style={{
-                fontFamily: "var(--font-ibm-plex-sans)",
-                color: "var(--ink-soft)",
-              }}
+            </Dialog.Title>
+            <Dialog.Description
+              className="mb-6 text-sm text-[var(--ink-soft)]"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
             >
               This action cannot be undone. The note will be permanently
               deleted.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={cancelDelete}
-                className="px-4 py-2 text-sm font-medium rounded-[10px] transition-colors"
-                style={{
-                  fontFamily: "var(--font-ibm-plex-sans)",
-                  color: "var(--ink-soft)",
-                  textDecoration: "underline",
-                }}
+            </Dialog.Description>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowDeleteDialog(false)}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
                 onClick={confirmDelete}
                 disabled={deleteMutation.isPending}
-                className="px-4 py-2 text-sm font-semibold rounded-[10px] transition-colors disabled:opacity-50"
-                style={{
-                  fontFamily: "var(--font-ibm-plex-sans)",
-                  backgroundColor: "var(--ink)",
-                  color: "var(--paper)",
-                }}
               >
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-              </button>
+                {deleteMutation.isPending ? "Deleting..." : "Delete note"}
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

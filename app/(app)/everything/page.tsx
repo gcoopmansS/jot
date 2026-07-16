@@ -2,6 +2,9 @@
 
 import { AppHeader } from "@/components/app-header/app-header";
 import { NoteCard } from "@/components/note-card/note-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingPage } from "@/components/ui/loading";
+import { FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Note } from "@/lib/types";
 
@@ -32,15 +35,14 @@ export default function EverythingPage() {
       <AppHeader title="Everything" />
       <div className="flex-1 px-10 py-6">
         {isLoading ? (
-          <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-            Loading notes...
-          </p>
+          <LoadingPage />
         ) : notes.length === 0 ? (
-          <div
-            className="text-sm text-center mt-12"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            No notes yet. Click + New note to start writing.
+          <div className="max-w-3xl mx-auto">
+            <EmptyState
+              icon={FileText}
+              title="No notes yet"
+              description="You haven't captured anything. Click + New note or press ⌘N to start writing."
+            />
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">

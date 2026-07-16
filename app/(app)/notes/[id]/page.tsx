@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { Note } from "@/lib/types";
+import { Kbd } from "@/components/ui/kbd";
 
 /**
  * Note detail page - shows a single note in full-screen editable view.
@@ -156,42 +158,21 @@ export default function NotePage() {
         >
           {hasChanges ? (
             <span>
-              Unsaved changes ·{" "}
-              <kbd
-                className="px-2 py-1 text-xs rounded"
-                style={{ backgroundColor: "var(--line)" }}
-              >
-                esc
-              </kbd>{" "}
-              to save and close
+              Unsaved changes · <Kbd className="mr-2">esc</Kbd> to save and
+              close
             </span>
           ) : (
             <span>
-              <kbd
-                className="px-2 py-1 text-xs rounded mr-2"
-                style={{ backgroundColor: "var(--line)" }}
-              >
-                esc
-              </kbd>
-              to close
+              <Kbd className="mr-2">esc</Kbd> to close
             </span>
           )}
         </div>
         <button
           onClick={handleClose}
-          className="px-2 py-1 rounded text-xl leading-none transition-colors cursor-pointer"
-          style={{ color: "var(--ink-soft)" }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(27, 37, 33, 0.06)";
-            e.currentTarget.style.color = "var(--ink)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.color = "var(--ink-soft)";
-          }}
+          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)]"
           aria-label="Close"
         >
-          ✕
+          <X className="h-5 w-5" />
         </button>
       </div>
 

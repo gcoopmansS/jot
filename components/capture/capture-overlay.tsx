@@ -2,16 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import { useCaptureOverlay } from "@/lib/capture-context";
 import { CategorizeBar } from "./categorize-bar";
+import { Kbd } from "@/components/ui/kbd";
 
 /**
  * Full-screen capture overlay for writing notes.
  *
  * This is the sacred capture flow: just a textarea, no forms, no required fields.
- * User can start typing immediately. ESC or clicking the X shows the categorize bar.
+ * User can start typing immediately. ESC or clicking X shows the categorize bar.
  *
- * The placeholder text guides the user: "Start typing — figure out where it goes later..."
+ * Uses Framer Motion for fade-in/scale animation (one of the two deliberate animations).
+ * Textarea uses Source Serif 4 to feel distinct from UI chrome.
  */
 export function CaptureOverlay() {
   const { isOpen, closeCapture } = useCaptureOverlay();
@@ -148,94 +152,69 @@ export function CaptureOverlay() {
 
   return (
     <>
-      <div
-        className="fixed inset-0 z-50 flex flex-col"
-        style={{ backgroundColor: "var(--paper)" }}
-      >
-        {/* Header with hint text and close button */}
-        <div
-          className="flex items-center justify-between px-10 py-5"
-          style={{ borderBottom: "1px solid var(--line)" }}
-        >
-          <div
-            className="text-sm"
-            style={{
-              fontFamily: "var(--font-ibm-plex-mono)",
-              color: "var(--ink-soft)",
-            }}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed inset-0 z-50 flex flex-col bg-[var(--paper)]"
           >
-            {!showCategorize && (
-              <>
-                <kbd
-                  className="px-2 py-1 text-xs rounded mr-2"
-                  style={{ backgroundColor: "var(--line)" }}
+            {/* Header with hint text and close button */}
+            <div className="flex items-center justify-between border-b border-[var(--line)] px-10 py-5">
+              <div
+                className="text-sm text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+              >
+                {!showCategorize && (
+                  <>
+                    <Kbd className="mr-2">esc</Kbd>
+                    to finish · <Kbd>⌘⏎</Kbd> also works
+                  </>
+                )}
+              </div>
+              {!showCategorize && (
+                <button
+                  onClick={handleClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)]"
+                  aria-label="Close"
                 >
-                  esc
-                </kbd>
-                to finish ·{" "}
-                <kbd
-                  className="px-2 py-1 text-xs rounded"
-                  style={{ backgroundColor: "var(--line)" }}
-                >
-                  ⌘⏎
-                </kbd>{" "}
-                also works
-              </>
-            )}
-          </div>
-          {!showCategorize && (
-            <button
-              onClick={handleClose}
-              className="px-2 py-1 rounded text-xl leading-none transition-colors cursor-pointer"
-              style={{ color: "var(--ink-soft)" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(27, 37, 33, 0.06)";
-                e.currentTarget.style.color = "var(--ink)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "var(--ink-soft)";
-              }}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Full-screen textarea */}
-        <div className="flex-1 flex justify-center px-10 overflow-y-auto">
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Start typing — figure out where it goes later…"
-            disabled={showCategorize || isSaving}
-            className="w-full max-w-3xl h-full resize-none bg-transparent border-none outline-none text-xl leading-relaxed disabled:opacity-50"
-            style={{
-              fontFamily: "var(--font-source-serif)",
-              color: "var(--ink)",
-              paddingTop: "6vh",
-            }}
-          />
-        </div>
-
-        {/* Saving indicator */}
-        {isSaving && (
-          <div
-            className="px-10 py-4"
-            style={{
-              borderTop: "1px solid var(--line)",
-              backgroundColor: "#f8f6f4",
-            }}
-          >
-            <div className="text-sm" style={{ color: "var(--ink-soft)" }}>
-              Saving...
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
-          </div>
+
+            {/* Full-screen textarea */}
+            <div className="flex flex-1 justify-center overflow-y-auto px-10">
+              <textarea
+                ref={textareaRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Start typing — figure out where it goes later…"
+                disabled={showCategorize || isSaving}
+                className="h-full w-full max-w-3xl resize-none border-none bg-transparent text-xl leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-soft)] disabled:opacity-50"
+                style={{
+                  fontFamily: "var(--font-source-serif)",
+                  paddingTop: "6vh",
+                }}
+              />
+            </div>
+
+            {/* Saving indicator */}
+            {isSaving && (
+              <div className="border-t border-[var(--line)] bg-[var(--paper)] px-10 py-4">
+                <div
+                  className="text-sm text-[var(--ink-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  Saving...
+                </div>
+              </div>
+            )}
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
 
       {/* Categorize bar (slides up from bottom) */}
       <CategorizeBar

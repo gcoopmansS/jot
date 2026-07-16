@@ -6,7 +6,24 @@ import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import * as Collapsible from "@radix-ui/react-collapsible";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import {
+  Inbox,
+  Grid3x3,
+  Plus,
+  Repeat,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import type { Project, Meeting, NoteTopic } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LoadingSpinner } from "@/components/ui/loading";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { cn } from "@/lib/utils";
 
 /**
  * Sidebar component for the Jot app.
@@ -17,7 +34,8 @@ import type { Project, Meeting, NoteTopic } from "@/lib/types";
  * - Projects list (collapsible)
  * - Sign out
  *
- * Matches the prototype design: clean, minimal, no emojis, with count badges.
+ * Following the design language: Space Grotesk for headers, IBM Plex Sans for links,
+ * IBM Plex Mono for counts, proper CSS variables, lucide icons.
  */
 export function Sidebar() {
   const pathname = usePathname();
@@ -29,6 +47,10 @@ export function Sidebar() {
   );
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editingProjectName, setEditingProjectName] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   // Fetch projects from API
   const { data: projects = [], isLoading: projectsLoading } = useQuery<
@@ -173,65 +195,137 @@ export function Sidebar() {
     }
   };
 
+  // Handle renaming a project
+  const handleRenameProject = async (projectId: string, newName: string) => {
+    if (!newName.trim()) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+        setEditingProjectId(null);
+        setEditingProjectName("");
+      }
+    } catch (error) {
+      console.error("Error renaming project:", error);
+    }
+  };
+
+  // Handle deleting a project
+  const handleDeleteProject = (project: Project) => {
+    setProjectToDelete(project);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ["projects"] });
+        queryClient.invalidateQueries({ queryKey: ["meetings"] });
+        queryClient.invalidateQueries({ queryKey: ["topics"] });
+        queryClient.invalidateQueries({ queryKey: ["notes"] });
+        queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+
+        // Navigate away if we're on a page for this project
+        if (pathname.startsWith(`/projects/${projectToDelete.id}`)) {
+          router.push("/everything");
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting project:", error);
+    }
+  };
+
   return (
-    <aside className="w-60 bg-[#F8F6F4] border-r border-[#E0DCD7] flex flex-col h-screen relative">
+    <aside className="flex h-screen w-60 flex-col border-r border-[var(--line)] bg-[var(--paper)]">
       {/* App title */}
-      <div className="px-5 pt-6 pb-5">
-        <h1 className="text-xl font-bold text-[#1A1A1A] tracking-tight">
-          Jot .
+      <div className="border-b border-[var(--line)] px-5 pb-5 pt-6">
+        <h1
+          className="text-xl font-semibold tracking-tight text-[var(--ink)]"
+          style={{ fontFamily: "var(--font-space-grotesk)" }}
+        >
+          Jot
         </h1>
-        <p className="text-[10px] text-[#8A8A8A] tracking-widest uppercase mt-0.5">
+        <p
+          className="mt-1 text-[10px] uppercase tracking-widest text-[var(--ink-soft)]"
+          style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+        >
           Capture first, file later
         </p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {/* Unsorted - amber badge for "needs attention" */}
         <Link
           href="/unsorted"
-          className={`flex items-center justify-between px-3 py-1.5 rounded text-sm transition-colors ${
+          className={cn(
+            "flex items-center justify-between gap-2 rounded-[var(--radius)] px-3 py-2 text-sm transition-colors",
             isActive("/unsorted")
-              ? "bg-[#EAE6E1] text-[#1A1A1A]"
-              : "text-[#4A4A4A] hover:bg-[#EAE6E1]"
-          }`}
+              ? "bg-[var(--accent-soft)] text-[var(--ink)]"
+              : "text-[var(--ink)] hover:bg-[var(--accent-soft)]",
+          )}
+          style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
         >
-          <span>Unsorted</span>
-          <span className="text-xs font-medium bg-[#F4B860] text-white px-2 py-0.5 rounded-full">
-            {noteCounts?.unsorted || 0}
+          <span className="flex items-center gap-2">
+            <Inbox className="h-4 w-4" />
+            Unsorted
           </span>
+          {noteCounts?.unsorted && noteCounts.unsorted > 0 && (
+            <Badge variant="unsorted">{noteCounts.unsorted}</Badge>
+          )}
         </Link>
 
         {/* Everything view */}
         <Link
           href="/everything"
-          className={`flex items-center justify-between px-3 py-1.5 rounded text-sm transition-colors ${
+          className={cn(
+            "flex items-center justify-between gap-2 rounded-[var(--radius)] px-3 py-2 text-sm transition-colors",
             isActive("/everything")
-              ? "bg-[#EAE6E1] text-[#1A1A1A]"
-              : "text-[#4A4A4A] hover:bg-[#EAE6E1]"
-          }`}
+              ? "bg-[var(--accent-soft)] text-[var(--ink)]"
+              : "text-[var(--ink)] hover:bg-[var(--accent-soft)]",
+          )}
+          style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
         >
-          <span>Everything</span>
-          <span className="text-xs font-medium bg-[#B0B0B0] text-white px-2 py-0.5 rounded-full">
-            {noteCounts?.total || 0}
+          <span className="flex items-center gap-2">
+            <Grid3x3 className="h-4 w-4" />
+            Everything
           </span>
+          {noteCounts?.total && noteCounts.total > 0 && (
+            <Badge variant="count">{noteCounts.total}</Badge>
+          )}
         </Link>
 
         {/* Projects section header */}
-        <div className="pt-6 pb-2 px-3">
-          <h2 className="text-[10px] uppercase tracking-widest text-[#9A9A9A] font-semibold">
+        <div className="pb-2 pt-6">
+          <h2
+            className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-soft)]"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
             Projects
           </h2>
         </div>
 
         {/* Projects list */}
         {projectsLoading ? (
-          <div className="px-3 py-1.5 text-sm text-[#9A9A9A]">Loading...</div>
+          <div className="flex items-center justify-center py-4">
+            <LoadingSpinner size="sm" />
+          </div>
         ) : projects.length === 0 ? (
           isCreatingProject ? (
-            <div className="px-3 py-1.5">
-              <input
-                type="text"
+            <div className="px-3 py-1">
+              <Input
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={handleProjectInputKeyDown}
@@ -240,23 +334,21 @@ export function Sidebar() {
                     setIsCreatingProject(false);
                   }
                 }}
-                className="w-full px-2 py-1 text-sm border border-[#3D6B66] rounded focus:outline-none"
-                style={{
-                  fontFamily: "var(--font-ibm-plex-sans)",
-                  backgroundColor: "var(--paper)",
-                  color: "var(--ink)",
-                }}
                 placeholder="Project name"
                 autoFocus
+                className="h-8 text-sm"
               />
             </div>
           ) : (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setIsCreatingProject(true)}
-              className="w-full text-left px-3 py-1.5 text-sm text-[#9A9A9A] hover:text-[#4A4A4A] transition-colors"
+              className="w-full justify-start gap-2 px-3"
             >
-              + New project
-            </button>
+              <Plus className="h-4 w-4" />
+              New project
+            </Button>
           )
         ) : (
           <>
@@ -266,114 +358,214 @@ export function Sidebar() {
               const isExpanded = expandedProjects.has(project.id);
 
               return (
-                <div key={project.id}>
-                  <button
-                    onClick={() => toggleProject(project.id)}
-                    className="flex items-center w-full px-3 py-1.5 text-sm text-[#4A4A4A] hover:bg-[#EAE6E1] rounded transition-colors"
-                  >
-                    <span className="text-xs mr-1.5">
-                      {isExpanded ? "▼" : "▶"}
-                    </span>
-                    {project.name}
-                  </button>
+                <Collapsible.Root
+                  key={project.id}
+                  open={isExpanded}
+                  onOpenChange={() => toggleProject(project.id)}
+                >
+                  {editingProjectId === project.id ? (
+                    <Input
+                      value={editingProjectName}
+                      onChange={(e) => setEditingProjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleRenameProject(project.id, editingProjectName);
+                        } else if (e.key === "Escape") {
+                          setEditingProjectId(null);
+                          setEditingProjectName("");
+                        }
+                      }}
+                      onBlur={() => {
+                        if (editingProjectName.trim()) {
+                          handleRenameProject(project.id, editingProjectName);
+                        } else {
+                          setEditingProjectId(null);
+                          setEditingProjectName("");
+                        }
+                      }}
+                      autoFocus
+                      className="h-9 text-sm"
+                    />
+                  ) : (
+                    <div className="group relative">
+                      <Collapsible.Trigger asChild>
+                        <button
+                          className="flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                        >
+                          <span className="text-xs text-[var(--ink-soft)]">
+                            {isExpanded ? "▼" : "▶"}
+                          </span>
+                          <span className="flex-1 text-left">
+                            {project.name}
+                          </span>
+                        </button>
+                      </Collapsible.Trigger>
 
-                  {/* Meetings and Notes sub-sections - shown when expanded */}
-                  {isExpanded && (
-                    <div className="ml-4 mt-1 space-y-2">
-                      {/* Meetings section */}
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-[#B0B0B0] font-semibold px-3 mb-1">
-                          Meetings
-                        </div>
-                        {meetingsLoading ? (
-                          <div className="px-3 py-1 text-xs text-[#9A9A9A]">
-                            Loading...
-                          </div>
-                        ) : projectMeetings.length === 0 ? (
-                          <div className="px-3 py-1 text-xs text-[#9A9A9A] italic">
-                            No meetings yet
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5">
-                            {projectMeetings.map((meeting) => (
-                              <Link
-                                key={meeting.id}
-                                href={`/projects/${project.id}/meetings/${meeting.id}`}
-                                className={`flex items-center justify-between px-3 py-1 rounded text-xs transition-colors ${
-                                  pathname ===
-                                  `/projects/${project.id}/meetings/${meeting.id}`
-                                    ? "bg-[#E4ECEA] text-[#1A1A1A]"
-                                    : "text-[#4A4A4A] hover:bg-[#EAE6E1]"
-                                }`}
-                              >
-                                <span className="flex items-center gap-1.5">
-                                  {meeting.name}
-                                  {meeting.recurring && (
-                                    <span
-                                      className="text-[#3D6B66]"
-                                      title="Recurring meeting"
-                                    >
-                                      ↻
-                                    </span>
-                                  )}
-                                </span>
-                                {noteCounts?.byMeeting[meeting.id] && (
-                                  <span className="text-[10px] text-[#9A9A9A]">
-                                    {noteCounts.byMeeting[meeting.id]}
-                                  </span>
-                                )}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button
+                              className="flex h-6 w-6 items-center justify-center rounded text-[var(--ink-soft)] transition-colors hover:bg-[var(--paper-raised)] hover:text-[var(--ink)]"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenu.Trigger>
 
-                      {/* Notes/Topics section */}
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-[#B0B0B0] font-semibold px-3 mb-1">
-                          Notes
-                        </div>
-                        {topicsLoading ? (
-                          <div className="px-3 py-1 text-xs text-[#9A9A9A]">
-                            Loading...
-                          </div>
-                        ) : projectTopics.length === 0 ? (
-                          <div className="px-3 py-1 text-xs text-[#9A9A9A] italic">
-                            No topics yet
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5">
-                            {projectTopics.map((topic) => (
-                              <Link
-                                key={topic.id}
-                                href={`/projects/${project.id}/topics/${topic.id}`}
-                                className={`flex items-center justify-between px-3 py-1 rounded text-xs transition-colors ${
-                                  pathname ===
-                                  `/projects/${project.id}/topics/${topic.id}`
-                                    ? "bg-[#EFE7F5] text-[#1A1A1A]"
-                                    : "text-[#4A4A4A] hover:bg-[#EAE6E1]"
-                                }`}
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                              className="min-w-[160px] rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-1 shadow-[var(--shadow-pop)]"
+                              sideOffset={5}
+                              align="end"
+                            >
+                              <DropdownMenu.Item
+                                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--ink)] outline-none transition-colors hover:bg-[var(--accent-soft)] focus:bg-[var(--accent-soft)]"
+                                style={{
+                                  fontFamily: "var(--font-ibm-plex-sans)",
+                                }}
+                                onSelect={() => {
+                                  setEditingProjectId(project.id);
+                                  setEditingProjectName(project.name);
+                                }}
                               >
-                                <span>{topic.name}</span>
-                                {noteCounts?.byTopic[topic.id] && (
-                                  <span className="text-[10px] text-[#9A9A9A]">
-                                    {noteCounts.byTopic[topic.id]}
-                                  </span>
-                                )}
-                              </Link>
-                            ))}
-                          </div>
-                        )}
+                                <Pencil className="h-4 w-4" />
+                                Rename
+                              </DropdownMenu.Item>
+
+                              <DropdownMenu.Separator className="my-1 h-px bg-[var(--line)]" />
+
+                              <DropdownMenu.Item
+                                className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 outline-none transition-colors hover:bg-red-50 focus:bg-red-50"
+                                style={{
+                                  fontFamily: "var(--font-ibm-plex-sans)",
+                                }}
+                                onSelect={() => handleDeleteProject(project)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
                       </div>
                     </div>
                   )}
-                </div>
+
+                  {/* Meetings and Notes sub-sections - shown when expanded */}
+                  <Collapsible.Content className="ml-6 mt-2 space-y-4">
+                    {/* Meetings section */}
+                    <div>
+                      <div
+                        className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-soft)]"
+                        style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+                      >
+                        Meetings
+                      </div>
+                      {meetingsLoading ? (
+                        <div className="px-2 py-1 text-xs text-[var(--ink-soft)]">
+                          Loading...
+                        </div>
+                      ) : projectMeetings.length === 0 ? (
+                        <div className="px-2 py-1 text-xs italic text-[var(--ink-soft)]">
+                          No meetings yet
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {projectMeetings.map((meeting) => (
+                            <Link
+                              key={meeting.id}
+                              href={`/projects/${project.id}/meetings/${meeting.id}`}
+                              className={cn(
+                                "flex items-center justify-between gap-2 rounded-[var(--radius)] px-2 py-1.5 text-xs transition-colors",
+                                pathname ===
+                                  `/projects/${project.id}/meetings/${meeting.id}`
+                                  ? "bg-[var(--accent-soft)] text-[var(--ink)]"
+                                  : "text-[var(--ink)] hover:bg-[var(--accent-soft)]",
+                              )}
+                              style={{
+                                fontFamily: "var(--font-ibm-plex-sans)",
+                              }}
+                            >
+                              <span className="flex items-center gap-1.5">
+                                {meeting.name}
+                                {meeting.recurring && (
+                                  <Repeat className="h-3 w-3 text-[var(--accent)]" />
+                                )}
+                              </span>
+                              {noteCounts?.byMeeting[meeting.id] && (
+                                <span
+                                  className="text-[10px] text-[var(--ink-soft)]"
+                                  style={{
+                                    fontFamily: "var(--font-ibm-plex-mono)",
+                                  }}
+                                >
+                                  {noteCounts.byMeeting[meeting.id]}
+                                </span>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Notes/Topics section */}
+                    <div>
+                      <div
+                        className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--ink-soft)]"
+                        style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+                      >
+                        Notes
+                      </div>
+                      {topicsLoading ? (
+                        <div className="px-2 py-1 text-xs text-[var(--ink-soft)]">
+                          Loading...
+                        </div>
+                      ) : projectTopics.length === 0 ? (
+                        <div className="px-2 py-1 text-xs italic text-[var(--ink-soft)]">
+                          No topics yet
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {projectTopics.map((topic) => (
+                            <Link
+                              key={topic.id}
+                              href={`/projects/${project.id}/topics/${topic.id}`}
+                              className={cn(
+                                "flex items-center justify-between gap-2 rounded-[var(--radius)] px-2 py-1.5 text-xs transition-colors",
+                                pathname ===
+                                  `/projects/${project.id}/topics/${topic.id}`
+                                  ? "bg-[var(--purple-soft)] text-[var(--ink)]"
+                                  : "text-[var(--ink)] hover:bg-[var(--accent-soft)]",
+                              )}
+                              style={{
+                                fontFamily: "var(--font-ibm-plex-sans)",
+                              }}
+                            >
+                              <span>{topic.name}</span>
+                              {noteCounts?.byTopic[topic.id] && (
+                                <span
+                                  className="text-[10px] text-[var(--ink-soft)]"
+                                  style={{
+                                    fontFamily: "var(--font-ibm-plex-mono)",
+                                  }}
+                                >
+                                  {noteCounts.byTopic[topic.id]}
+                                </span>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </Collapsible.Content>
+                </Collapsible.Root>
               );
             })}
             {isCreatingProject ? (
-              <div className="px-3 py-1.5">
-                <input
-                  type="text"
+              <div className="px-3 py-1">
+                <Input
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   onKeyDown={handleProjectInputKeyDown}
@@ -382,37 +574,53 @@ export function Sidebar() {
                       setIsCreatingProject(false);
                     }
                   }}
-                  className="w-full px-2 py-1 text-sm border border-[#3D6B66] rounded focus:outline-none"
-                  style={{
-                    fontFamily: "var(--font-ibm-plex-sans)",
-                    backgroundColor: "var(--paper)",
-                    color: "var(--ink)",
-                  }}
                   placeholder="Project name"
                   autoFocus
+                  className="h-8 text-sm"
                 />
               </div>
             ) : (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setIsCreatingProject(true)}
-                className="w-full text-left px-3 py-1.5 text-sm text-[#9A9A9A] hover:text-[#4A4A4A] transition-colors"
+                className="w-full justify-start gap-2 px-3"
               >
-                + New project
-              </button>
+                <Plus className="h-4 w-4" />
+                New project
+              </Button>
             )}
           </>
         )}
       </nav>
 
       {/* Footer with sign out */}
-      <div className="px-3 py-3 border-t border-[#E0DCD7]">
-        <button
+      <div className="border-t border-[var(--line)] px-3 py-4">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={handleSignOut}
-          className="w-full px-3 py-1.5 text-[#8A8A8A] hover:text-[#4A4A4A] hover:bg-[#EAE6E1] rounded transition-colors text-left text-sm"
+          className="w-full justify-start"
         >
           Sign out
-        </button>
+        </Button>
       </div>
+
+      {/* Delete confirmation modal */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Project"
+        description={
+          projectToDelete
+            ? `Are you sure you want to delete "${projectToDelete.name}" and all its meetings, topics, and notes? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete Project"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteProject}
+        variant="danger"
+      />
     </aside>
   );
 }

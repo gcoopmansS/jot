@@ -26,7 +26,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }, [openCapture]);
 
   return (
-    <div className="flex h-screen bg-[#FEFCFA]">
+    <div className="flex h-screen bg-[var(--paper)]">
       {/* Sidebar - fixed width on the left */}
       <Sidebar />
 

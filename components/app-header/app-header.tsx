@@ -1,61 +1,59 @@
 "use client";
 
 import { useCaptureOverlay } from "@/lib/capture-context";
-import { ReactNode } from "react";
+import { Search, Plus } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { cn } from "@/lib/utils";
 
 /**
- * App header component.
+ * App header component following Jot's design language.
  *
- * Shows:
- * - Current page title
- * - Search bar
- * - + New note button (primary action)
+ * Layout:
+ * - Left: Page title in Space Grotesk
+ * - Center: Search bar with Search icon
+ * - Right: "New note" button with Plus icon and ⌘N keyboard hint
  *
- * Matches the prototype design.
+ * White background, bottom border, max-width container centered.
  */
 export function AppHeader({ title }: { title: string | ReactNode }) {
   const { openCapture } = useCaptureOverlay();
+  const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <header className="border-b border-[#E0DCD7] bg-white px-6 py-4 flex items-center justify-between">
-      {/* Page title */}
-      <h2 className="text-lg font-semibold text-[#1A1A1A]">{title}</h2>
+    <header className="border-b border-[var(--line)] bg-[var(--paper-raised)]">
+      <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-6 px-10 py-4">
+        {/* Page title */}
+        <h2
+          className="text-lg font-semibold text-[var(--ink)]"
+          style={{ fontFamily: "var(--font-space-grotesk)" }}
+        >
+          {title}
+        </h2>
 
-      {/* Search and New Note */}
-      <div className="flex items-center gap-4">
         {/* Search bar */}
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#B0B0B0]"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-soft)]" />
           <input
             type="text"
-            placeholder="Search notes, projects, topics..."
-            className="pl-10 pr-4 py-2 w-80 text-sm bg-[#F8F6F4] border border-[#E0DCD7] rounded-md focus:outline-none focus:ring-2 focus:ring-[#1A1A1A] focus:border-transparent placeholder:text-[#B0B0B0]"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search notes..."
+            className={cn(
+              "h-10 w-full rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper)] pl-10 pr-4 text-sm text-[var(--ink)] placeholder:text-[var(--ink-soft)]",
+              "transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2",
+            )}
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
           />
         </div>
 
         {/* New note button */}
-        <button
-          onClick={openCapture}
-          className="px-4 py-2 bg-[#1A1A1A] text-white text-sm font-medium rounded-md hover:bg-[#2A2A2A] transition-colors flex items-center gap-2"
-        >
-          <span className="text-lg leading-none">+</span>
-          <span>New note</span>
-          <kbd className="ml-1 px-1.5 py-0.5 text-xs bg-[#3A3A3A] rounded">
-            ⌘N
-          </kbd>
-        </button>
+        <Button onClick={openCapture} variant="primary" className="gap-2">
+          <Plus className="h-4 w-4" />
+          New note
+          <Kbd>⌘N</Kbd>
+        </Button>
       </div>
     </header>
   );

@@ -2,16 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { Project } from "@/lib/types";
 import { AutocompleteInput } from "./autocomplete-input";
+import { Button } from "@/components/ui/button";
 
 /**
  * Categorize bar shown after capturing a note.
+ *
+ * This is the second deliberate animation: slides up from bottom with
+ * custom easing: cubic-bezier(.2, .8, .2, 1), 300ms duration.
+ *
  * Features:
- * - Slide-up animation from bottom
- * - Custom autocomplete inputs that clearly show existing vs new options
- * - Type toggle buttons with full color fills when selected
- * - Refined spacing and typography matching design system
+ * - Type toggle buttons (Meeting/General) with selected state styling
+ * - Autocomplete inputs for Project and Topic/Meeting
+ * - "Save note" primary button and "Keep in Unsorted" secondary button
  */
 
 type CategorizeBarProps = {
@@ -168,147 +173,106 @@ export function CategorizeBar({ isOpen, onSave, onSkip }: CategorizeBarProps) {
 
   const getTypeHint = () => {
     if (type === "meeting")
-      return 'Will save as a Meeting — topic is optional, defaults to "General meeting"';
-    if (type === "general")
-      return 'Will save as a General note — topic is optional, defaults to "General"';
-    return "No type chosen — will save as a General note";
+      return "Meeting notes — add to a recurring thread or one-time meeting";
+    if (type === "general") return "General notes — analysis, drafts, findings";
+    return "Choose Meeting or General to categorize";
   };
 
   return (
-    <div
-      className={`fixed left-0 right-0 bottom-0 bg-white border-t transition-transform duration-300 ease-out z-50 ${
-        isOpen ? "translate-y-0" : "translate-y-full"
-      }`}
-      style={{
-        borderColor: "var(--line)",
-        boxShadow: "0 -12px 30px rgba(27, 37, 33, 0.10)",
-      }}
-    >
-      <div className="max-w-3xl mx-auto px-10 py-6">
-        {/* Title */}
-        <div className="mb-4">
-          <h3
-            className="text-base font-semibold mb-0"
-            style={{
-              fontFamily: "var(--font-space-grotesk)",
-              color: "var(--ink)",
-            }}
-          >
-            What are these notes about?{" "}
-            <span className="font-normal" style={{ color: "var(--ink-soft)" }}>
-              — optional, you can always file later
-            </span>
-          </h3>
-        </div>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ y: "110%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "110%" }}
+          transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--line)] bg-[var(--paper-raised)]"
+          style={{ boxShadow: "var(--shadow-pop)" }}
+        >
+          <div className="mx-auto max-w-3xl px-10 py-6">
+            {/* Title */}
+            <div className="mb-4">
+              <h3
+                className="text-base font-semibold text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-space-grotesk)" }}
+              >
+                What are these notes about?{" "}
+                <span
+                  className="font-normal text-[var(--ink-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  — optional, you can always file later
+                </span>
+              </h3>
+            </div>
 
-        {/* Type toggle row */}
-        <div className="flex items-center gap-3 mb-4">
-          <div
-            className="flex border rounded-lg overflow-hidden"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <button
-              onClick={() => setType(type === "meeting" ? null : "meeting")}
-              className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                type === "meeting" ? "text-white" : "hover:bg-opacity-50"
-              }`}
-              style={{
-                backgroundColor:
-                  type === "meeting" ? "var(--accent)" : "var(--paper)",
-                color: type === "meeting" ? "#fff" : "var(--ink-soft)",
-              }}
-            >
-              Meeting
-            </button>
-            <button
-              onClick={() => setType(type === "general" ? null : "general")}
-              className={`px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                type === "general" ? "text-white" : "hover:bg-opacity-50"
-              }`}
-              style={{
-                backgroundColor:
-                  type === "general" ? "var(--purple)" : "var(--paper)",
-                color: type === "general" ? "#fff" : "var(--ink-soft)",
-              }}
-            >
-              General
-            </button>
+            {/* Type toggle row */}
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex overflow-hidden rounded-[var(--radius)] border border-[var(--line)]">
+                <button
+                  onClick={() => setType(type === "meeting" ? null : "meeting")}
+                  data-state={type === "meeting" ? "selected" : "unselected"}
+                  className="cursor-pointer px-4 py-2 text-sm font-medium transition-colors data-[state=selected]:bg-[var(--accent)] data-[state=selected]:text-white data-[state=unselected]:bg-[var(--paper)] data-[state=unselected]:text-[var(--ink-soft)] data-[state=unselected]:hover:bg-[var(--accent-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  Meeting
+                </button>
+                <button
+                  onClick={() => setType(type === "general" ? null : "general")}
+                  data-state={type === "general" ? "selected" : "unselected"}
+                  className="cursor-pointer px-4 py-2 text-sm font-medium transition-colors data-[state=selected]:bg-[var(--purple)] data-[state=selected]:text-white data-[state=unselected]:bg-[var(--paper)] data-[state=unselected]:text-[var(--ink-soft)] data-[state=unselected]:hover:bg-[var(--purple-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  General
+                </button>
+              </div>
+              <div
+                className="text-xs text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+              >
+                {getTypeHint()}
+              </div>
+            </div>
+
+            {/* Input fields */}
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              {/* Project */}
+              <AutocompleteInput
+                value={projectInput}
+                onChange={setProjectInput}
+                options={projects.map((p) => ({ id: p.id, name: p.name }))}
+                placeholder="e.g. Client Migration"
+                label="Which project?"
+                disabled={isLoadingProjects}
+              />
+
+              {/* Topic or Meeting */}
+              <AutocompleteInput
+                value={topicInput}
+                onChange={setTopicInput}
+                options={topics}
+                placeholder={
+                  type === "meeting"
+                    ? "e.g. Stakeholder sync"
+                    : "e.g. Requirements analysis"
+                }
+                label={type === "meeting" ? "Meeting or topic?" : "Topic?"}
+                disabled={!projectInput}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <Button onClick={handleSave} variant="primary">
+                File note
+              </Button>
+              <Button onClick={onSkip} variant="secondary">
+                Skip for now
+              </Button>
+            </div>
           </div>
-          <div
-            className="text-xs"
-            style={{
-              fontFamily: "var(--font-ibm-plex-mono)",
-              color: "var(--ink-soft)",
-            }}
-          >
-            {getTypeHint()}
-          </div>
-        </div>
-
-        {/* Input fields */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          {/* Project */}
-          <AutocompleteInput
-            value={projectInput}
-            onChange={setProjectInput}
-            options={projects.map((p) => ({ id: p.id, name: p.name }))}
-            placeholder="e.g. Client Migration"
-            label="Project"
-            disabled={isLoadingProjects}
-          />
-
-          {/* Topic or Meeting */}
-          <AutocompleteInput
-            value={topicInput}
-            onChange={setTopicInput}
-            options={topics}
-            placeholder={
-              type === "meeting"
-                ? "e.g. Stakeholder sync"
-                : "e.g. Requirements analysis"
-            }
-            label={type === "meeting" ? "Meeting" : "Topic"}
-            disabled={!projectInput}
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSave}
-            className="px-5 py-2 text-sm font-semibold rounded-lg transition-colors hover:opacity-90 cursor-pointer"
-            style={{
-              fontFamily: "var(--font-space-grotesk)",
-              backgroundColor: "var(--ink)",
-              color: "var(--paper)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--accent)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--ink)";
-            }}
-          >
-            Save note
-          </button>
-          <button
-            onClick={onSkip}
-            className="px-3 py-2 text-sm underline transition-colors cursor-pointer"
-            style={{
-              color: "var(--ink-soft)",
-              textDecorationColor: "var(--line)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--ink)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--ink-soft)";
-            }}
-          >
-            Keep in Unsorted
-          </button>
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

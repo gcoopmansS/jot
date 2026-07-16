@@ -162,7 +162,7 @@ export function AutocompleteInput({
         className="px-3 py-2 text-sm border rounded-lg outline-none transition-colors disabled:opacity-50"
         style={{
           borderColor: isOpen ? "var(--accent)" : "var(--line)",
-          backgroundColor: disabled ? "#f8f6f4" : "var(--paper)",
+          backgroundColor: disabled ? "var(--paper)" : "var(--paper)",
           color: "var(--ink)",
         }}
       />

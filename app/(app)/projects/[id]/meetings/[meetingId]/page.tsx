@@ -2,6 +2,10 @@
 
 import { AppHeader } from "@/components/app-header/app-header";
 import { NoteCard } from "@/components/note-card/note-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingPage } from "@/components/ui/loading";
+import { MeetingStack } from "@/components/meeting-stack/meeting-stack";
+import { Calendar } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import type { Note, Meeting } from "@/lib/types";
@@ -52,9 +56,7 @@ export default function MeetingPage() {
       <>
         <AppHeader title="Loading..." />
         <div className="flex-1 px-10 py-6">
-          <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-            Loading meeting...
-          </p>
+          <LoadingPage />
         </div>
       </>
     );
@@ -92,28 +94,33 @@ export default function MeetingPage() {
         }
       />
       <div className="flex-1 px-10 py-6">
-        {notesLoading ? (
-          <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
-            Loading notes...
-          </p>
-        ) : notes.length === 0 ? (
-          <div
-            className="text-center py-12"
-            style={{ color: "var(--ink-soft)" }}
-          >
-            <p className="text-sm">No notes for this meeting yet.</p>
-            <p className="text-xs mt-2">
-              Create a note and categorize it to "{meeting.name}" to see it
-              here.
-            </p>
-          </div>
-        ) : (
-          <div className="max-w-3xl mx-auto space-y-4">
-            {notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
-            ))}
-          </div>
-        )}
+        <div className="max-w-3xl mx-auto">
+          {/* Show recurring meeting stack for recurring meetings */}
+          {meeting.recurring && notes.length > 0 && (
+            <MeetingStack
+              meetingName={meeting.name}
+              cadence={meeting.cadence}
+              attendees={meeting.attendees}
+              lastNote={notes[0]} // Most recent note (sorted descending)
+            />
+          )}
+
+          {notesLoading ? (
+            <LoadingPage />
+          ) : notes.length === 0 ? (
+            <EmptyState
+              icon={Calendar}
+              title="No notes yet"
+              description={`Create a note and categorize it to "${meeting.name}" to see it here.`}
+            />
+          ) : (
+            <div className="space-y-4">
+              {notes.map((note) => (
+                <NoteCard key={note.id} note={note} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
