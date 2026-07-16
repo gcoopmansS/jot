@@ -63,6 +63,7 @@ action.
 that specific meeting.
 
 **Key attributes of Meetings:**
+
 - Can be marked `recurring` (boolean toggle)
 - Optional `cadence` field (free text, e.g. "Every 3 weeks")
 - Optional `attendees` field (free text)
@@ -80,6 +81,7 @@ defaults to a "General" bucket rather than blocking the user.
 shows all notes for that specific topic.
 
 **Key attributes of Topics:**
+
 - Just a name and a reference to a Project
 - No recurring concept at all
 - No cadence or attendees

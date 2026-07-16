@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * Layout:
  * - Left: Page title in Space Grotesk
  * - Center: Search bar with Search icon
- * - Right: "New note" button with Plus icon and ⌘N keyboard hint
+ * - Right: "New note" button with Plus icon and ⌘⏎ keyboard hint
  *
  * White background, bottom border, max-width container centered.
  */
@@ -52,7 +52,7 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
         <Button onClick={openCapture} variant="primary" className="gap-2">
           <Plus className="h-4 w-4" />
           New note
-          <Kbd>⌘N</Kbd>
+          <Kbd>⌘⏎</Kbd>
         </Button>
       </div>
     </header>

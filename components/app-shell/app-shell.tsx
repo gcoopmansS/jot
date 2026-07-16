@@ -10,12 +10,25 @@ import { CaptureOverlay } from "@/components/capture/capture-overlay";
  * Handles keyboard shortcuts for opening capture.
  */
 function AppShellInner({ children }: { children: React.ReactNode }) {
-  const { openCapture } = useCaptureOverlay();
+  const { openCapture, isOpen } = useCaptureOverlay();
 
-  // Global keyboard shortcut: Cmd/Ctrl + N to open capture
+  // Global keyboard shortcut: Cmd/Ctrl + Enter to open capture
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+      // Only fire if Cmd/Ctrl + Enter is pressed
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        // Don't open if already open
+        if (isOpen) return;
+
+        // Don't fire if user is typing in an input, textarea, or contenteditable
+        const target = e.target as HTMLElement;
+        const isTyping =
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable;
+
+        if (isTyping) return;
+
         e.preventDefault();
         openCapture();
       }
@@ -23,7 +36,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [openCapture]);
+  }, [openCapture, isOpen]);
 
   return (
     <div className="flex h-screen bg-[var(--paper)]">

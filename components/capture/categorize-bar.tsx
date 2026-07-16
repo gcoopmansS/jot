@@ -28,9 +28,15 @@ type CategorizeBarProps = {
     meetingId?: string;
   }) => void;
   onSkip: () => void;
+  onBack: () => void;
 };
 
-export function CategorizeBar({ isOpen, onSave, onSkip }: CategorizeBarProps) {
+export function CategorizeBar({
+  isOpen,
+  onSave,
+  onSkip,
+  onBack,
+}: CategorizeBarProps) {
   const queryClient = useQueryClient();
   const [type, setType] = useState<"meeting" | "general" | null>(null);
   const [projectInput, setProjectInput] = useState("");
@@ -186,6 +192,7 @@ export function CategorizeBar({ isOpen, onSave, onSkip }: CategorizeBarProps) {
           animate={{ y: 0 }}
           exit={{ y: "110%" }}
           transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+          onClick={(e) => e.stopPropagation()}
           className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--line)] bg-[var(--paper-raised)]"
           style={{ boxShadow: "var(--shadow-pop)" }}
         >
@@ -262,13 +269,22 @@ export function CategorizeBar({ isOpen, onSave, onSkip }: CategorizeBarProps) {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-3">
-              <Button onClick={handleSave} variant="primary">
-                File note
-              </Button>
-              <Button onClick={onSkip} variant="secondary">
-                Skip for now
-              </Button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={onBack}
+                className="text-sm text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)] cursor-pointer"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              >
+                ← Back to note
+              </button>
+              <div className="flex items-center gap-3">
+                <Button onClick={handleSave} variant="primary">
+                  File note
+                </Button>
+                <Button onClick={onSkip} variant="secondary">
+                  Skip for now
+                </Button>
+              </div>
             </div>
           </div>
         </motion.div>
