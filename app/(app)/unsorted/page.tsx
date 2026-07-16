@@ -51,8 +51,8 @@ export default function UnsortedPage() {
           <div className="max-w-3xl mx-auto">
             <EmptyState
               icon={Inbox}
-              title="All caught up"
-              description="No unsorted notes — everything is filed. New notes will appear here when you skip categorizing."
+              title="No unsorted notes"
+              description="Notes you choose not to file will appear here. They're just as valid as filed notes — file them whenever it makes sense, or never."
             />
           </div>
         )}

@@ -79,7 +79,19 @@ class PendingSavesManager {
    * Add a note to the pending queue.
    */
   addPending(save: PendingSave): void {
-    this.pending.set(save.id, save);
+    // Sanitize the save to ensure it meets the constraint
+    const hasCategorization =
+      (save.type === "meeting" && save.meetingId) ||
+      (save.type === "general" && save.topicId);
+
+    // If no categorization, ensure isUnsorted is true
+    const sanitizedSave = {
+      ...save,
+      isUnsorted:
+        save.isUnsorted !== undefined ? save.isUnsorted : !hasCategorization,
+    };
+
+    this.pending.set(sanitizedSave.id, sanitizedSave);
     this.savePending();
   }
 
@@ -189,7 +201,23 @@ class PendingSavesManager {
       const stored = localStorage.getItem(PENDING_SAVES_KEY);
       if (stored) {
         const saves: PendingSave[] = JSON.parse(stored);
-        this.pending = new Map(saves.map((save) => [save.id, save]));
+
+        // Sanitize old pending saves to ensure they meet the constraint
+        const sanitizedSaves = saves.map((save) => {
+          // Check if the save has proper categorization
+          const hasCategorization =
+            (save.type === "meeting" && save.meetingId) ||
+            (save.type === "general" && save.topicId);
+
+          // If no categorization but isUnsorted is false/undefined, fix it
+          if (!hasCategorization && !save.isUnsorted) {
+            return { ...save, isUnsorted: true };
+          }
+
+          return save;
+        });
+
+        this.pending = new Map(sanitizedSaves.map((save) => [save.id, save]));
 
         // Retry any pending saves on startup
         if (this.pending.size > 0 && networkMonitor.isOnline()) {

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Trash2, ArrowRight } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Note } from "@/lib/types";
 import { useState } from "react";
@@ -18,6 +18,7 @@ import { motion } from "framer-motion";
  * - Type badge (MEETING or GENERAL) using Badge component
  * - Timestamp in uppercase IBM Plex Mono format (JAN 15, 2026)
  * - Preview text in Source Serif 4 (signals "this is note content")
+ * - "File this →" button for unsorted notes
  * - Delete button (Trash2 icon, visible on hover)
  *
  * Hover state: border color shifts from --line to --ink-soft
@@ -76,6 +77,12 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
     } else {
       router.push(`/notes/${note.id}`);
     }
+  };
+
+  const handleFileThis = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    // Navigate to the note detail page where categorize bar will be shown
+    router.push(`/notes/${note.id}?file=true`);
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -156,6 +163,20 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
           {previewText}
           {isLong && "..."}
         </p>
+
+        {/* File this button for unsorted notes */}
+        {note.is_unsorted && (
+          <div className="mt-4">
+            <button
+              onClick={handleFileThis}
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-soft)] underline transition-colors hover:text-[var(--ink)] cursor-pointer"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            >
+              File this
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* Delete confirmation dialog using Radix */}

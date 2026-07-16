@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { Note } from "@/lib/types";
 import { Kbd } from "@/components/ui/kbd";
+import { CategorizeBar } from "@/components/capture/categorize-bar";
 import { retryWithBackoff } from "@/lib/retry";
 import { pendingSavesManager } from "@/lib/pending-saves";
 
@@ -15,16 +16,21 @@ import { pendingSavesManager } from "@/lib/pending-saves";
  * Looks identical to the capture overlay but loads and updates existing notes.
  * User can edit the text and changes auto-save on blur or when pressing ESC.
  *
+ * For unsorted notes: shows categorize bar to allow filing.
+ *
  * RELIABILITY: Uses the same retry logic as capture overlay for reliable saves.
  */
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const noteId = params.id as string;
+  const shouldShowFilePrompt = searchParams.get("file") === "true";
 
   const [text, setText] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+  const [showCategorize, setShowCategorize] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "retrying" | "failed"
   >("idle");
@@ -49,15 +55,19 @@ export default function NotePage() {
   useEffect(() => {
     if (note) {
       setText(note.text);
+      // Auto-show categorize bar if this is an unsorted note or if ?file=true
+      if (note.is_unsorted || shouldShowFilePrompt) {
+        setShowCategorize(true);
+      }
     }
-  }, [note]);
+  }, [note, shouldShowFilePrompt]);
 
-  // Focus textarea when page loads
+  // Focus textarea when page loads (but not when categorize bar is shown)
   useEffect(() => {
-    if (textareaRef.current && !isLoading) {
+    if (textareaRef.current && !isLoading && !showCategorize) {
       textareaRef.current.focus();
     }
-  }, [isLoading]);
+  }, [isLoading, showCategorize]);
 
   // Listen for save status changes from the pending saves manager (for background retries)
   useEffect(() => {
@@ -177,6 +187,58 @@ export default function NotePage() {
     router.back();
   }, [hasChanges, handleSave, router]);
 
+  // Handle categorization from the categorize bar
+  const handleCategorize = async (data: {
+    type: "meeting" | "general";
+    projectId?: string;
+    topicId?: string;
+    meetingId?: string;
+    isUnsorted?: boolean;
+  }) => {
+    // Update the note with categorization
+    try {
+      const response = await fetch(`/api/notes/${noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: data.type,
+          meeting_id: data.meetingId || null,
+          topic_id: data.topicId || null,
+          is_unsorted: data.isUnsorted || false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update note");
+      }
+
+      // Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+
+      // Close categorize bar and navigate back
+      setShowCategorize(false);
+      router.back();
+    } catch (error) {
+      console.error("Error categorizing note:", error);
+    }
+  };
+
+  const handleSkipCategorize = () => {
+    // Just close the categorize bar and go back
+    setShowCategorize(false);
+    router.back();
+  };
+
+  const handleBackFromCategorize = () => {
+    // Return to editing
+    setShowCategorize(false);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   // Debounced autosave: save 1.5 seconds after user stops typing
   useEffect(() => {
     if (!hasChanges || !text.trim()) {
@@ -200,8 +262,10 @@ export default function NotePage() {
     };
   }, [text, hasChanges, handleSave]);
 
-  // Handle ESC key to save and go back
+  // Handle ESC key to save and go back (only when not in categorize mode)
   useEffect(() => {
+    if (showCategorize) return; // Don't handle ESC when categorize bar is shown
+
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         await handleSave();
@@ -211,7 +275,7 @@ export default function NotePage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, router]);
+  }, [handleSave, router, showCategorize]);
 
   // Warn before leaving when there are unsaved changes
   useEffect(() => {
@@ -359,6 +423,14 @@ export default function NotePage() {
           </div>
         </div>
       )}
+
+      {/* Categorize bar for unsorted notes */}
+      <CategorizeBar
+        isOpen={showCategorize}
+        onSave={handleCategorize}
+        onSkip={handleSkipCategorize}
+        onBack={handleBackFromCategorize}
+      />
     </div>
   );
 }

@@ -49,6 +49,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine if note should be marked as unsorted
+    // If is_unsorted is explicitly provided, use that value
+    // Otherwise, infer: if no categorization IDs are provided, mark as unsorted
+    const hasCategorization =
+      (body.type === "meeting" && body.meeting_id) ||
+      (body.type === "general" && body.topic_id);
+
+    const isUnsorted =
+      body.is_unsorted !== undefined ? body.is_unsorted : !hasCategorization;
+
     // Prepare the note data
     const noteData = {
       ...(body.id && { id: body.id }), // Include client ID if provided
@@ -57,7 +67,7 @@ export async function POST(request: NextRequest) {
       type: body.type,
       meeting_id: body.meeting_id || null,
       topic_id: body.topic_id || null,
-      is_unsorted: body.is_unsorted || false,
+      is_unsorted: isUnsorted,
     };
 
     // Use upsert to handle retries gracefully
