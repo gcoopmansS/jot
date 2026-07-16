@@ -48,7 +48,7 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
         {/* New note button */}
         <button
           onClick={openCapture}
-          className="px-4 py-2 bg-[#1A1A1A] text-white text-sm font-medium rounded-md hover:bg-[#2A2A2A] transition-colors flex items-center gap-2 cursor-pointer"
+          className="px-4 py-2 bg-[#1A1A1A] text-white text-sm font-medium rounded-md hover:bg-[#2A2A2A] transition-colors flex items-center gap-2"
         >
           <span className="text-lg leading-none">+</span>
           <span>New note</span>

@@ -29,16 +29,6 @@ export function Sidebar() {
   );
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(
-    null,
-  );
-  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(
-    null,
-  );
-  const [renameValue, setRenameValue] = useState("");
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(
-    null,
-  );
 
   // Fetch projects from API
   const { data: projects = [], isLoading: projectsLoading } = useQuery<
@@ -135,43 +125,6 @@ export function Sidebar() {
     },
   });
 
-  // Mutation to rename a project
-  const renameProjectMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      if (!response.ok) throw new Error("Failed to rename project");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      setRenamingProjectId(null);
-      setRenameValue("");
-    },
-  });
-
-  // Mutation to delete a project
-  const deleteProjectMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: "DELETE",
-      });
-      if (!response.ok) throw new Error("Failed to delete project");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      queryClient.invalidateQueries({ queryKey: ["topics"] });
-      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
-      setDeletingProjectId(null);
-      setOpenMenuProjectId(null);
-    },
-  });
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/auth/sign-in");
@@ -180,57 +133,6 @@ export function Sidebar() {
 
   // Helper to check if a link is active
   const isActive = (path: string) => pathname === path;
-
-  //
-
-  // Start renaming a project
-  const startRenaming = (project: Project) => {
-    setRenamingProjectId(project.id);
-    setRenameValue(project.name);
-    setOpenMenuProjectId(null);
-  };
-
-  // Handle renaming a project
-  const handleRenameProject = (projectId: string) => {
-    if (
-      renameValue.trim() &&
-      renameValue.trim() !== projects.find((p) => p.id === projectId)?.name
-    ) {
-      renameProjectMutation.mutate({ id: projectId, name: renameValue.trim() });
-    } else {
-      setRenamingProjectId(null);
-      setRenameValue("");
-    }
-  };
-
-  // Handle key down in rename input
-  const handleRenameKeyDown = (e: React.KeyboardEvent, projectId: string) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleRenameProject(projectId);
-    } else if (e.key === "Escape") {
-      setRenamingProjectId(null);
-      setRenameValue("");
-    }
-  };
-
-  // Confirm delete
-  const confirmDelete = (projectId: string) => {
-    setDeletingProjectId(projectId);
-    setOpenMenuProjectId(null);
-  };
-
-  // Handle delete confirmed
-  const handleDeleteConfirmed = () => {
-    if (deletingProjectId) {
-      deleteProjectMutation.mutate(deletingProjectId);
-    }
-  };
-
-  // Cancel delete
-  const cancelDelete = () => {
-    setDeletingProjectId(null);
-  };
 
   // Toggle project expansion
   const toggleProject = (projectId: string) => {
@@ -288,7 +190,7 @@ export function Sidebar() {
         {/* Unsorted - amber badge for "needs attention" */}
         <Link
           href="/unsorted"
-          className={`flex items-center justify-between px-3 py-1.5 rounded text-sm transition-colors cursor-pointer ${
+          className={`flex items-center justify-between px-3 py-1.5 rounded text-sm transition-colors ${
             isActive("/unsorted")
               ? "bg-[#EAE6E1] text-[#1A1A1A]"
               : "text-[#4A4A4A] hover:bg-[#EAE6E1]"
@@ -303,7 +205,7 @@ export function Sidebar() {
         {/* Everything view */}
         <Link
           href="/everything"
-          className={`flex items-center justify-between px-3 py-1.5 rounded text-sm transition-colors cursor-pointer ${
+          className={`flex items-center justify-between px-3 py-1.5 rounded text-sm transition-colors ${
             isActive("/everything")
               ? "bg-[#EAE6E1] text-[#1A1A1A]"
               : "text-[#4A4A4A] hover:bg-[#EAE6E1]"
@@ -351,7 +253,7 @@ export function Sidebar() {
           ) : (
             <button
               onClick={() => setIsCreatingProject(true)}
-              className="w-full text-left px-3 py-1.5 text-sm text-[#9A9A9A] hover:text-[#4A4A4A] transition-colors cursor-pointer"
+              className="w-full text-left px-3 py-1.5 text-sm text-[#9A9A9A] hover:text-[#4A4A4A] transition-colors"
             >
               + New project
             </button>
@@ -362,79 +264,18 @@ export function Sidebar() {
               const projectMeetings = getMeetingsForProject(project.id);
               const projectTopics = getTopicsForProject(project.id);
               const isExpanded = expandedProjects.has(project.id);
-              const isRenaming = renamingProjectId === project.id;
-              const menuOpen = openMenuProjectId === project.id;
 
               return (
                 <div key={project.id}>
-                  {isRenaming ? (
-                    <div className="px-3 py-1.5">
-                      <input
-                        type="text"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => handleRenameKeyDown(e, project.id)}
-                        onBlur={() => handleRenameProject(project.id)}
-                        className="w-full px-2 py-1 text-sm border border-[#3D6B66] rounded focus:outline-none"
-                        style={{
-                          fontFamily: "var(--font-ibm-plex-sans)",
-                          backgroundColor: "var(--paper)",
-                          color: "var(--ink)",
-                        }}
-                        autoFocus
-                      />
-                    </div>
-                  ) : (
-                    <div className="group relative">
-                      <div className="flex items-center justify-between px-3 py-1.5 text-sm text-[#4A4A4A] hover:bg-[#EAE6E1] rounded transition-colors">
-                        <button
-                          onClick={() => toggleProject(project.id)}
-                          className="flex items-center flex-1 text-left cursor-pointer"
-                        >
-                          <span className="text-xs mr-1.5">
-                            {isExpanded ? "▼" : "▶"}
-                          </span>
-                          {project.name}
-                        </button>
-                        <div
-                          className="relative pb-1"
-                          onMouseLeave={() => setOpenMenuProjectId(null)}
-                        >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuProjectId(
-                                menuOpen ? null : project.id,
-                              );
-                            }}
-                            className="opacity-0 group-hover:opacity-100 px-2 py-1 text-[#8A8A8A] hover:text-[#4A4A4A] transition-opacity -mr-2 cursor-pointer"
-                            title="Project options"
-                          >
-                            ⋯
-                          </button>
-                          {menuOpen && (
-                            <div
-                              className="absolute right-0 top-full w-32 bg-white rounded shadow-[0_12px_32px_rgba(27,37,33,0.16),0_2px_8px_rgba(27,37,33,0.08)] border border-[#DEDBCF] py-1 z-50"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                onClick={() => startRenaming(project)}
-                                className="w-full text-left px-3 py-1.5 text-sm text-[#1A1A1A] hover:bg-[#EAE6E1] transition-colors cursor-pointer"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                onClick={() => confirmDelete(project.id)}
-                                className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => toggleProject(project.id)}
+                    className="flex items-center w-full px-3 py-1.5 text-sm text-[#4A4A4A] hover:bg-[#EAE6E1] rounded transition-colors"
+                  >
+                    <span className="text-xs mr-1.5">
+                      {isExpanded ? "▼" : "▶"}
+                    </span>
+                    {project.name}
+                  </button>
 
                   {/* Meetings and Notes sub-sections - shown when expanded */}
                   {isExpanded && (
@@ -458,7 +299,7 @@ export function Sidebar() {
                               <Link
                                 key={meeting.id}
                                 href={`/projects/${project.id}/meetings/${meeting.id}`}
-                                className={`flex items-center justify-between px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                                className={`flex items-center justify-between px-3 py-1 rounded text-xs transition-colors ${
                                   pathname ===
                                   `/projects/${project.id}/meetings/${meeting.id}`
                                     ? "bg-[#E4ECEA] text-[#1A1A1A]"
@@ -506,7 +347,7 @@ export function Sidebar() {
                               <Link
                                 key={topic.id}
                                 href={`/projects/${project.id}/topics/${topic.id}`}
-                                className={`flex items-center justify-between px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                                className={`flex items-center justify-between px-3 py-1 rounded text-xs transition-colors ${
                                   pathname ===
                                   `/projects/${project.id}/topics/${topic.id}`
                                     ? "bg-[#EFE7F5] text-[#1A1A1A]"
@@ -554,7 +395,7 @@ export function Sidebar() {
             ) : (
               <button
                 onClick={() => setIsCreatingProject(true)}
-                className="w-full text-left px-3 py-1.5 text-sm text-[#9A9A9A] hover:text-[#4A4A4A] transition-colors cursor-pointer"
+                className="w-full text-left px-3 py-1.5 text-sm text-[#9A9A9A] hover:text-[#4A4A4A] transition-colors"
               >
                 + New project
               </button>
@@ -567,43 +408,11 @@ export function Sidebar() {
       <div className="px-3 py-3 border-t border-[#E0DCD7]">
         <button
           onClick={handleSignOut}
-          className="w-full px-3 py-1.5 text-[#8A8A8A] hover:text-[#4A4A4A] hover:bg-[#EAE6E1] rounded transition-colors text-left text-sm cursor-pointer"
+          className="w-full px-3 py-1.5 text-[#8A8A8A] hover:text-[#4A4A4A] hover:bg-[#EAE6E1] rounded transition-colors text-left text-sm"
         >
           Sign out
         </button>
       </div>
-
-      {/* Delete confirmation dialog */}
-      {deletingProjectId && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div
-            className="bg-white rounded-lg shadow-[0_12px_32px_rgba(27,37,33,0.16),0_2px_8px_rgba(27,37,33,0.08)] p-6 max-w-sm mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">
-              Delete project?
-            </h3>
-            <p className="text-sm text-[#5B655F] mb-4">
-              This will permanently delete the project and all its meetings,
-              topics, and notes. This action cannot be undone.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={cancelDelete}
-                className="px-4 py-2 text-sm text-[#5B655F] hover:text-[#1A1A1A] transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirmed}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors cursor-pointer"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }
