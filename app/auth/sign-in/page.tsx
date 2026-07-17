@@ -1,8 +1,8 @@
 "use client";
 
 import { createClient } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 
 /**
  * Sign-in/sign-up page for the Jot app.
@@ -12,13 +12,25 @@ import { useState } from "react";
  * - Create a new account with email/password
  *
  * After successful auth, users are redirected to the main app.
+ *
+ * Supports ?mode=sign-up URL parameter to default to sign-up mode.
  */
 export default function AuthPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   // Track which mode we're in: sign-in or sign-up
+  // Check URL parameter to determine initial mode
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+
+  // Set initial mode from URL parameter
+  useEffect(() => {
+    const urlMode = searchParams.get("mode");
+    if (urlMode === "sign-up") {
+      setMode("sign-up");
+    }
+  }, [searchParams]);
 
   // Form fields
   const [email, setEmail] = useState("");
@@ -72,14 +84,20 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--paper)] px-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-[#2C2416] mb-2 font-[family-name:var(--font-space-grotesk)]">
+          <h1
+            className="text-4xl font-semibold text-[var(--ink)] mb-2"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
             Jot
           </h1>
-          <p className="text-[#6B5A48] font-[family-name:var(--font-ibm-plex-sans)]">
+          <p
+            className="text-[var(--ink-soft)]"
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+          >
             {mode === "sign-in"
               ? "Sign in to your account"
               : "Create a new account"}
@@ -87,7 +105,7 @@ export default function AuthPage() {
         </div>
 
         {/* Mode toggle */}
-        <div className="flex gap-2 mb-6 bg-white rounded-lg p-1 shadow-sm">
+        <div className="flex gap-2 mb-6 bg-[var(--paper-raised)] rounded-[var(--radius)] p-1 border border-[var(--line)]">
           <button
             type="button"
             onClick={() => {
@@ -95,10 +113,11 @@ export default function AuthPage() {
               setError(null);
               setMessage(null);
             }}
-            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors font-[family-name:var(--font-ibm-plex-sans)] cursor-pointer ${
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            className={`flex-1 py-2 px-4 rounded-[var(--radius)] font-medium transition-colors ${
               mode === "sign-in"
-                ? "bg-[#3D6B66] text-white"
-                : "text-[#6B5A48] hover:bg-gray-50"
+                ? "bg-[var(--accent)] text-white"
+                : "text-[var(--ink-soft)] hover:bg-[var(--paper)]"
             }`}
           >
             Sign In
@@ -110,10 +129,11 @@ export default function AuthPage() {
               setError(null);
               setMessage(null);
             }}
-            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors font-[family-name:var(--font-ibm-plex-sans)] cursor-pointer ${
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            className={`flex-1 py-2 px-4 rounded-[var(--radius)] font-medium transition-colors ${
               mode === "sign-up"
-                ? "bg-[#3D6B66] text-white"
-                : "text-[#6B5A48] hover:bg-gray-50"
+                ? "bg-[var(--accent)] text-white"
+                : "text-[var(--ink-soft)] hover:bg-[var(--paper)]"
             }`}
           >
             Sign Up
@@ -123,18 +143,24 @@ export default function AuthPage() {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-lg shadow-sm p-6"
+          className="bg-[var(--paper-raised)] rounded-[var(--radius)] border border-[var(--line)] p-6"
         >
           {/* Error message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-800 text-sm font-[family-name:var(--font-ibm-plex-sans)]">
+            <div
+              className="mb-4 p-3 bg-red-50 border border-red-200 rounded-[var(--radius)] text-red-800 text-sm"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            >
               {error}
             </div>
           )}
 
           {/* Success message */}
           {message && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-800 text-sm font-[family-name:var(--font-ibm-plex-sans)]">
+            <div
+              className="mb-4 p-3 bg-green-50 border border-green-200 rounded-[var(--radius)] text-green-800 text-sm"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            >
               {message}
             </div>
           )}
@@ -143,7 +169,8 @@ export default function AuthPage() {
           <div className="mb-4">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-[#2C2416] mb-1 font-[family-name:var(--font-ibm-plex-sans)]"
+              className="block text-xs uppercase tracking-wide font-medium text-[var(--ink-soft)] mb-2"
+              style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
             >
               Email
             </label>
@@ -153,7 +180,8 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3D6B66] focus:border-transparent font-[family-name:var(--font-ibm-plex-sans)]"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              className="w-full px-3 py-2 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--paper)] focus:outline-none focus:border-[var(--accent)] transition-colors text-[var(--ink)]"
               placeholder="you@example.com"
             />
           </div>
@@ -162,7 +190,8 @@ export default function AuthPage() {
           <div className="mb-6">
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-[#2C2416] mb-1 font-[family-name:var(--font-ibm-plex-sans)]"
+              className="block text-xs uppercase tracking-wide font-medium text-[var(--ink-soft)] mb-2"
+              style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
             >
               Password
             </label>
@@ -173,11 +202,15 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#3D6B66] focus:border-transparent font-[family-name:var(--font-ibm-plex-sans)]"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              className="w-full px-3 py-2 border border-[var(--line)] rounded-[var(--radius)] bg-[var(--paper)] focus:outline-none focus:border-[var(--accent)] transition-colors text-[var(--ink)]"
               placeholder="••••••••"
             />
             {mode === "sign-up" && (
-              <p className="mt-1 text-xs text-[#6B5A48] font-[family-name:var(--font-ibm-plex-sans)]">
+              <p
+                className="mt-2 text-xs text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              >
                 Must be at least 6 characters
               </p>
             )}
@@ -187,7 +220,8 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-[#3D6B66] text-white rounded-md font-medium hover:bg-[#2F5450] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#3D6B66] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-[family-name:var(--font-ibm-plex-sans)] cursor-pointer"
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            className="w-full py-3 px-4 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium hover:bg-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading
               ? "Loading..."
