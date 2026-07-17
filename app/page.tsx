@@ -1,6 +1,7 @@
 import { getUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   ArrowRight,
   Edit3,
@@ -9,6 +10,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { InteractiveDemo } from "@/components/landing/interactive-demo";
+import { AccountDeletedNotification } from "@/components/landing/account-deleted-notification";
 
 /**
  * Public landing page shown to logged-out visitors.
@@ -26,6 +28,10 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[var(--paper)]">
+      {/* Account deletion notification */}
+      <Suspense fallback={null}>
+        <AccountDeletedNotification />
+      </Suspense>
       {/* Header */}
       <header className="border-b border-[var(--line)] bg-[var(--paper-raised)]">
         <div className="max-w-6xl mx-auto px-10 h-16 flex items-center justify-between">

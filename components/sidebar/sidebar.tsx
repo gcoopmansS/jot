@@ -696,8 +696,13 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Footer with sign out */}
-      <div className="border-t border-[var(--line)] px-3 py-4">
+      {/* Footer with settings and sign out */}
+      <div className="border-t border-[var(--line)] px-3 py-4 space-y-1">
+        <Link href="/settings">
+          <Button variant="ghost" size="sm" className="w-full justify-start">
+            Account
+          </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"
