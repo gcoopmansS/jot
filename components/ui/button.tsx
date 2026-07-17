@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
  * - secondary: no background, underlined text, subtle hover
  * - ghost: minimal styling, background on hover
  * - toggle: for type selectors (Meeting/General) with selected state
+ * - destructive: red background for dangerous actions (delete, etc.)
  */
 const buttonVariants = cva(
   // Base styles - always applied
@@ -23,6 +24,8 @@ const buttonVariants = cva(
         ghost: "hover:bg-[var(--accent-soft)] text-[var(--ink)]",
         toggle:
           "border border-[var(--line)] data-[state=selected]:border-transparent data-[state=selected]:text-white data-[state=unselected]:bg-[var(--paper)] data-[state=unselected]:text-[var(--ink)]",
+        destructive:
+          "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600",
       },
       size: {
         default: "h-10 px-4 py-2",
