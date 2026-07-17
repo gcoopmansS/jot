@@ -88,6 +88,10 @@ export async function PATCH(
       updates.text = body.text;
     }
 
+    if (body.title !== undefined) {
+      updates.title = body.title;
+    }
+
     if (body.type !== undefined) {
       // Validate type if provided
       if (body.type !== "meeting" && body.type !== "general") {
@@ -176,7 +180,10 @@ export async function PATCH(
 /**
  * DELETE /api/notes/[id]
  *
- * Deletes a note by ID.
+ * Deletes a note by ID, and automatically cleans up empty containers:
+ * - If this was the last note in a Notes topic → delete the topic
+ * - If this was the last note in a non-recurring Meeting → delete the meeting
+ * - If this was the last note in a recurring Meeting → keep it (deliberate setup)
  */
 export async function DELETE(
   request: NextRequest,
@@ -194,22 +201,111 @@ export async function DELETE(
 
     const { id } = await params;
 
+    // First, fetch the note to capture its meeting_id/topic_id before deletion
+    const { data: noteToDelete, error: fetchError } = await supabase
+      .from("notes")
+      .select("meeting_id, topic_id, type")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (fetchError || !noteToDelete) {
+      console.error("Error fetching note before deletion:", fetchError);
+      return NextResponse.json(
+        { error: "Note not found", details: fetchError?.message },
+        { status: 404 },
+      );
+    }
+
+    const { meeting_id, topic_id, type } = noteToDelete;
+
     // Delete the note
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from("notes")
       .delete()
       .eq("id", id)
       .eq("user_id", user.id);
 
-    if (error) {
-      console.error("Error deleting note:", error);
+    if (deleteError) {
+      console.error("Error deleting note:", deleteError);
       return NextResponse.json(
-        { error: "Failed to delete note", details: error.message },
+        { error: "Failed to delete note", details: deleteError.message },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ success: true });
+    // Now check if we need to clean up empty containers
+    let deletedMeetingId: string | null = null;
+    let deletedTopicId: string | null = null;
+
+    // If the note was in a meeting, check if the meeting is now empty
+    if (meeting_id) {
+      const { count: remainingNotesCount } = await supabase
+        .from("notes")
+        .select("*", { count: "exact", head: true })
+        .eq("meeting_id", meeting_id);
+
+      if (remainingNotesCount === 0) {
+        // Meeting is now empty - check if it's recurring
+        const { data: meeting } = await supabase
+          .from("meetings")
+          .select("recurring")
+          .eq("id", meeting_id)
+          .single();
+
+        // Only delete if it's NOT recurring
+        if (meeting && !meeting.recurring) {
+          const { error: deleteMeetingError } = await supabase
+            .from("meetings")
+            .delete()
+            .eq("id", meeting_id);
+
+          if (!deleteMeetingError) {
+            deletedMeetingId = meeting_id;
+            console.log(
+              `Auto-deleted empty non-recurring meeting: ${meeting_id}`,
+            );
+          } else {
+            console.error("Error deleting empty meeting:", deleteMeetingError);
+          }
+        } else if (meeting && meeting.recurring) {
+          console.log(
+            `Keeping empty recurring meeting (deliberate setup): ${meeting_id}`,
+          );
+        }
+      }
+    }
+
+    // If the note was in a topic, check if the topic is now empty
+    if (topic_id) {
+      const { count: remainingNotesCount } = await supabase
+        .from("notes")
+        .select("*", { count: "exact", head: true })
+        .eq("topic_id", topic_id);
+
+      if (remainingNotesCount === 0) {
+        // Topic is now empty - always delete (topics have no "recurring" concept)
+        const { error: deleteTopicError } = await supabase
+          .from("note_topics")
+          .delete()
+          .eq("id", topic_id);
+
+        if (!deleteTopicError) {
+          deletedTopicId = topic_id;
+          console.log(`Auto-deleted empty topic: ${topic_id}`);
+        } else {
+          console.error("Error deleting empty topic:", deleteTopicError);
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      cleanup: {
+        deletedMeetingId,
+        deletedTopicId,
+      },
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
     return NextResponse.json(

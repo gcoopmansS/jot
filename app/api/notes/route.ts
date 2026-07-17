@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       ...(body.id && { id: body.id }), // Include client ID if provided
       user_id: user.id,
       text: body.text,
+      title: body.title || null,
       type: body.type,
       meeting_id: body.meeting_id || null,
       topic_id: body.topic_id || null,

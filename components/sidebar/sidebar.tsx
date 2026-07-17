@@ -327,6 +327,76 @@ export function Sidebar() {
           )}
         </Link>
 
+        {/* Recurring meetings section */}
+        <div className="pb-2 pt-6">
+          <h2
+            className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-soft)]"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
+            Recurring
+          </h2>
+        </div>
+
+        {meetingsLoading ? (
+          <div className="flex items-center justify-center py-2">
+            <LoadingSpinner size="sm" />
+          </div>
+        ) : meetings.filter((m) => m.recurring).length === 0 ? (
+          <div
+            className="px-3 py-2 text-xs italic text-[var(--ink-soft)]"
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+          >
+            No recurring meetings yet — mark one as recurring from its meeting
+            page
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {meetings
+              .filter((m) => m.recurring)
+              .map((meeting) => {
+                const project = projects.find(
+                  (p) => p.id === meeting.project_id,
+                );
+                return (
+                  <Link
+                    key={meeting.id}
+                    href={`/projects/${meeting.project_id}/meetings/${meeting.id}`}
+                    className={cn(
+                      "flex items-center justify-between gap-2 rounded-[var(--radius)] px-3 py-2 text-sm transition-colors",
+                      pathname ===
+                        `/projects/${meeting.project_id}/meetings/${meeting.id}`
+                        ? "bg-[var(--accent-soft)] text-[var(--ink)]"
+                        : "text-[var(--ink)] hover:bg-[var(--accent-soft)]",
+                    )}
+                    style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Repeat className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      <span className="flex flex-col gap-0.5">
+                        <span>{meeting.name}</span>
+                        {project && (
+                          <span
+                            className="text-[10px] text-[var(--ink-soft)]"
+                            style={{
+                              fontFamily: "var(--font-ibm-plex-mono)",
+                            }}
+                          >
+                            {project.name}
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                    {noteCounts?.byMeeting[meeting.id] && (
+                      <Badge variant="count">
+                        {noteCounts.byMeeting[meeting.id]}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
+          </div>
+        )}
+
         {/* Projects section header */}
         <div className="pb-2 pt-6">
           <h2
@@ -409,19 +479,23 @@ export function Sidebar() {
                     />
                   ) : (
                     <div className="group relative">
-                      <Collapsible.Trigger asChild>
-                        <button
-                          className="flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm text-[var(--ink)] transition-colors group-hover:bg-[var(--accent-soft)] cursor-pointer"
+                      <div className="flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm text-[var(--ink)] transition-colors group-hover:bg-[var(--accent-soft)]">
+                        <Collapsible.Trigger asChild>
+                          <button
+                            className="text-xs text-[var(--ink-soft)] cursor-pointer hover:text-[var(--ink)] transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {isExpanded ? "▼" : "▶"}
+                          </button>
+                        </Collapsible.Trigger>
+                        <Link
+                          href={`/projects/${project.id}`}
+                          className="flex-1 text-left cursor-pointer"
                           style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                         >
-                          <span className="text-xs text-[var(--ink-soft)]">
-                            {isExpanded ? "▼" : "▶"}
-                          </span>
-                          <span className="flex-1 text-left">
-                            {project.name}
-                          </span>
-                        </button>
-                      </Collapsible.Trigger>
+                          {project.name}
+                        </Link>
+                      </div>
 
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
                         <DropdownMenu.Root
@@ -516,10 +590,10 @@ export function Sidebar() {
                                 }}
                               >
                                 <span className="flex items-center gap-1.5">
-                                  {meeting.name}
                                   {meeting.recurring && (
                                     <Repeat className="h-3 w-3 text-[var(--accent)]" />
                                   )}
+                                  {meeting.name}
                                 </span>
                                 {noteCounts?.byMeeting[meeting.id] && (
                                   <span

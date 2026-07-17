@@ -39,6 +39,7 @@ export type Note = {
   id: string;
   user_id: string;
   text: string;
+  title: string | null; // Optional title for the note
   type: "meeting" | "general";
   meeting_id: string | null;
   topic_id: string | null;
@@ -48,10 +49,19 @@ export type Note = {
 };
 
 /**
+ * Enriched note with location information for display in mixed views.
+ */
+export type NoteWithLocation = Note & {
+  project_name?: string;
+  location_name?: string; // Meeting name or Topic name
+};
+
+/**
  * Data needed to create a new note.
  */
 export type CreateNoteInput = {
   text: string;
+  title?: string | null;
   type: "meeting" | "general";
   meeting_id?: string | null;
   topic_id?: string | null;

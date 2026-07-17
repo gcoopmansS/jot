@@ -1,24 +1,28 @@
 "use client";
 
 import { AppHeader } from "@/components/app-header/app-header";
-import { NoteCard } from "@/components/note-card/note-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingPage } from "@/components/ui/loading";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Calendar, BookOpen, Repeat } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, useRouter } from "next/navigation";
-import type { Note, Project, Meeting, NoteTopic } from "@/lib/types";
-import { AnimatePresence } from "framer-motion";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import type { Project, Meeting, NoteTopic } from "@/lib/types";
 
 /**
- * Project detail page - shows all notes for a specific project.
+ * Project overview page - shows a summary/index of all meetings and topics in a project.
  *
- * Displays both meeting notes and general notes organized by their
- * topics. Each note appears as a card.
+ * Displays:
+ * - Project name in header
+ * - List of meetings with note counts (clickable to view that meeting)
+ * - List of topics with note counts (clickable to view that topic)
+ *
+ * This is the landing page when clicking a project name in the sidebar,
+ * and the redirect target when a meeting/topic is auto-deleted after
+ * removing its last note.
  */
-export default function ProjectPage() {
+export default function ProjectOverviewPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params.id as string;
 
   // Fetch the project
@@ -34,37 +38,10 @@ export default function ProjectPage() {
     },
   });
 
-  // Fetch all notes for this project
-  const { data: notes = [], isLoading: notesLoading } = useQuery<Note[]>({
-    queryKey: ["notes", "project", projectId],
-    queryFn: async () => {
-      const response = await fetch("/api/notes");
-      if (!response.ok) throw new Error("Failed to fetch notes");
-      const allNotes = await response.json();
-
-      // Filter notes that belong to this project (via meeting or topic)
-      const meetingsResponse = await fetch("/api/meetings");
-      const meetings: Meeting[] = await meetingsResponse.json();
-      const projectMeetingIds = meetings
-        .filter((m) => m.project_id === projectId)
-        .map((m) => m.id);
-
-      const topicsResponse = await fetch("/api/topics");
-      const topics: NoteTopic[] = await topicsResponse.json();
-      const projectTopicIds = topics
-        .filter((t) => t.project_id === projectId)
-        .map((t) => t.id);
-
-      return allNotes.filter(
-        (note: Note) =>
-          (note.meeting_id && projectMeetingIds.includes(note.meeting_id)) ||
-          (note.topic_id && projectTopicIds.includes(note.topic_id)),
-      );
-    },
-  });
-
-  // Fetch meetings and topics for grouping
-  const { data: meetings = [] } = useQuery<Meeting[]>({
+  // Fetch meetings for this project
+  const { data: meetings = [], isLoading: meetingsLoading } = useQuery<
+    Meeting[]
+  >({
     queryKey: ["meetings", projectId],
     queryFn: async () => {
       const response = await fetch("/api/meetings");
@@ -74,13 +51,47 @@ export default function ProjectPage() {
     },
   });
 
-  const { data: topics = [] } = useQuery<NoteTopic[]>({
-    queryKey: ["topics", projectId],
+  // Fetch topics for this project
+  const { data: topics = [], isLoading: topicsLoading } = useQuery<NoteTopic[]>(
+    {
+      queryKey: ["topics", projectId],
+      queryFn: async () => {
+        const response = await fetch("/api/topics");
+        if (!response.ok) throw new Error("Failed to fetch topics");
+        const allTopics = await response.json();
+        return allTopics.filter((t: NoteTopic) => t.project_id === projectId);
+      },
+    },
+  );
+
+  // Fetch note counts
+  const { data: noteCounts } = useQuery({
+    queryKey: ["note-counts"],
     queryFn: async () => {
-      const response = await fetch("/api/topics");
-      if (!response.ok) throw new Error("Failed to fetch topics");
-      const allTopics = await response.json();
-      return allTopics.filter((t: NoteTopic) => t.project_id === projectId);
+      const response = await fetch("/api/notes");
+      if (!response.ok) throw new Error("Failed to fetch notes");
+      const notes = await response.json();
+
+      // Count notes by meeting
+      const meetingCounts = notes
+        .filter((n: any) => n.meeting_id)
+        .reduce((acc: Record<string, number>, note: any) => {
+          acc[note.meeting_id] = (acc[note.meeting_id] || 0) + 1;
+          return acc;
+        }, {});
+
+      // Count notes by topic
+      const topicCounts = notes
+        .filter((n: any) => n.topic_id)
+        .reduce((acc: Record<string, number>, note: any) => {
+          acc[note.topic_id] = (acc[note.topic_id] || 0) + 1;
+          return acc;
+        }, {});
+
+      return {
+        byMeeting: meetingCounts,
+        byTopic: topicCounts,
+      };
     },
   });
 
@@ -108,28 +119,28 @@ export default function ProjectPage() {
     );
   }
 
-  // Group notes by meeting and topic
-  const meetingNotes = notes.filter((n) => n.meeting_id);
-  const topicNotes = notes.filter((n) => n.topic_id);
+  const totalMeetings = meetings.length;
+  const totalTopics = topics.length;
+  const hasContent = totalMeetings > 0 || totalTopics > 0;
 
   return (
     <>
       <AppHeader title={project.name} />
       <div className="flex-1 px-10 py-6">
-        {notesLoading ? (
+        {meetingsLoading || topicsLoading ? (
           <LoadingPage />
-        ) : notes.length === 0 ? (
+        ) : !hasContent ? (
           <div className="max-w-3xl mx-auto">
             <EmptyState
               icon={FolderOpen}
-              title="No notes in this project yet"
-              description={`Create a note and file it to "${project.name}" to see it here.`}
+              title="No meetings or notes yet"
+              description={`Create a note and file it to "${project.name}" to get started.`}
             />
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-8">
-            {/* Meeting notes section */}
-            {meetingNotes.length > 0 && (
+            {/* Meetings section */}
+            {meetings.length > 0 && (
               <div>
                 <h2
                   className="text-sm uppercase tracking-wide mb-4"
@@ -138,50 +149,96 @@ export default function ProjectPage() {
                     color: "var(--ink-soft)",
                   }}
                 >
-                  Meeting Notes
+                  Meetings ({meetings.length})
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {meetings.map((meeting) => {
-                    const meetingNotesFiltered = meetingNotes.filter(
-                      (n) => n.meeting_id === meeting.id,
-                    );
-                    if (meetingNotesFiltered.length === 0) return null;
-
+                    const noteCount = noteCounts?.byMeeting[meeting.id] || 0;
                     return (
-                      <div key={meeting.id}>
-                        <h3
-                          className="text-base font-medium mb-3 flex items-center gap-2"
-                          style={{
-                            fontFamily: "var(--font-space-grotesk)",
-                            color: "var(--ink)",
-                          }}
-                        >
-                          {meeting.name}
-                          {meeting.recurring && (
-                            <span
+                      <Link
+                        key={meeting.id}
+                        href={`/projects/${projectId}/meetings/${meeting.id}`}
+                        className="block rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-4 transition-colors hover:border-[var(--accent)]"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Calendar
+                                className="h-4 w-4"
+                                style={{ color: "var(--accent)" }}
+                              />
+                              <h3
+                                className="text-base font-medium"
+                                style={{
+                                  fontFamily: "var(--font-space-grotesk)",
+                                  color: "var(--ink)",
+                                }}
+                              >
+                                {meeting.name}
+                              </h3>
+                              {meeting.recurring && (
+                                <span title="Recurring meeting">
+                                  <Repeat
+                                    className="h-4 w-4"
+                                    style={{ color: "var(--accent)" }}
+                                  />
+                                </span>
+                              )}
+                            </div>
+                            {(meeting.cadence || meeting.attendees) && (
+                              <div className="mt-2 space-y-1">
+                                {meeting.cadence && (
+                                  <p
+                                    className="text-xs"
+                                    style={{ color: "var(--ink-soft)" }}
+                                  >
+                                    <span className="font-medium">
+                                      Cadence:
+                                    </span>{" "}
+                                    {meeting.cadence}
+                                  </p>
+                                )}
+                                {meeting.attendees && (
+                                  <p
+                                    className="text-xs"
+                                    style={{ color: "var(--ink-soft)" }}
+                                  >
+                                    <span className="font-medium">
+                                      Attendees:
+                                    </span>{" "}
+                                    {meeting.attendees}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            className="text-right"
+                            style={{
+                              fontFamily: "var(--font-ibm-plex-mono)",
+                              color: "var(--ink-soft)",
+                            }}
+                          >
+                            <div
+                              className="text-2xl font-semibold"
                               style={{ color: "var(--accent)" }}
-                              title="Recurring meeting"
                             >
-                              ↻
-                            </span>
-                          )}
-                        </h3>
-                        <div className="space-y-4">
-                          <AnimatePresence>
-                            {meetingNotesFiltered.map((note) => (
-                              <NoteCard key={note.id} note={note} />
-                            ))}
-                          </AnimatePresence>
+                              {noteCount}
+                            </div>
+                            <div className="text-xs uppercase tracking-wide">
+                              {noteCount === 1 ? "note" : "notes"}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
               </div>
             )}
 
-            {/* Topic notes section */}
-            {topicNotes.length > 0 && (
+            {/* Topics section */}
+            {topics.length > 0 && (
               <div>
                 <h2
                   className="text-sm uppercase tracking-wide mb-4"
@@ -190,34 +247,55 @@ export default function ProjectPage() {
                     color: "var(--ink-soft)",
                   }}
                 >
-                  General Notes
+                  Notes ({topics.length}{" "}
+                  {topics.length === 1 ? "topic" : "topics"})
                 </h2>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {topics.map((topic) => {
-                    const topicNotesFiltered = topicNotes.filter(
-                      (n) => n.topic_id === topic.id,
-                    );
-                    if (topicNotesFiltered.length === 0) return null;
-
+                    const noteCount = noteCounts?.byTopic[topic.id] || 0;
                     return (
-                      <div key={topic.id}>
-                        <h3
-                          className="text-base font-medium mb-3"
-                          style={{
-                            fontFamily: "var(--font-space-grotesk)",
-                            color: "var(--ink)",
-                          }}
-                        >
-                          {topic.name}
-                        </h3>
-                        <div className="space-y-4">
-                          <AnimatePresence>
-                            {topicNotesFiltered.map((note) => (
-                              <NoteCard key={note.id} note={note} />
-                            ))}
-                          </AnimatePresence>
+                      <Link
+                        key={topic.id}
+                        href={`/projects/${projectId}/topics/${topic.id}`}
+                        className="block rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-4 transition-colors hover:border-[var(--purple)]"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <BookOpen
+                                className="h-4 w-4"
+                                style={{ color: "var(--purple)" }}
+                              />
+                              <h3
+                                className="text-base font-medium"
+                                style={{
+                                  fontFamily: "var(--font-space-grotesk)",
+                                  color: "var(--ink)",
+                                }}
+                              >
+                                {topic.name}
+                              </h3>
+                            </div>
+                          </div>
+                          <div
+                            className="text-right"
+                            style={{
+                              fontFamily: "var(--font-ibm-plex-mono)",
+                              color: "var(--ink-soft)",
+                            }}
+                          >
+                            <div
+                              className="text-2xl font-semibold"
+                              style={{ color: "var(--purple)" }}
+                            >
+                              {noteCount}
+                            </div>
+                            <div className="text-xs uppercase tracking-wide">
+                              {noteCount === 1 ? "note" : "notes"}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>

@@ -21,7 +21,9 @@ import { Button } from "@/components/ui/button";
 
 type CategorizeBarProps = {
   isOpen: boolean;
+  initialTitle?: string;
   onSave: (data: {
+    title?: string;
     type: "meeting" | "general";
     projectId?: string;
     topicId?: string;
@@ -34,11 +36,13 @@ type CategorizeBarProps = {
 
 export function CategorizeBar({
   isOpen,
+  initialTitle = "",
   onSave,
   onSkip,
   onBack,
 }: CategorizeBarProps) {
   const queryClient = useQueryClient();
+  const [title, setTitle] = useState(initialTitle);
   const [type, setType] = useState<"meeting" | "general" | null>(null);
   const [projectInput, setProjectInput] = useState("");
   const [topicInput, setTopicInput] = useState("");
@@ -177,6 +181,7 @@ export function CategorizeBar({
       (type === "meeting" && meetingId) || (type === "general" && topicId);
 
     onSave({
+      title: title.trim() || undefined, // Include title if provided
       type: type || "general",
       projectId,
       topicId,
@@ -186,10 +191,9 @@ export function CategorizeBar({
   };
 
   const getTypeHint = () => {
-    if (type === "meeting")
-      return "Meeting notes — add to a recurring thread or one-time meeting";
-    if (type === "general") return "General notes — analysis, drafts, findings";
-    return "Choose Meeting or General to categorize";
+    if (type === "meeting") return "Will save as a Meeting";
+    if (type === "general") return "Will save as a General note";
+    return "No type chosen — will save as a General note";
   };
 
   return (
@@ -205,7 +209,7 @@ export function CategorizeBar({
           style={{ boxShadow: "var(--shadow-pop)" }}
         >
           <div className="mx-auto max-w-3xl px-10 py-6">
-            {/* Title */}
+            {/* Heading */}
             <div className="mb-4">
               <h3
                 className="text-base font-semibold text-[var(--ink)]"
@@ -221,13 +225,31 @@ export function CategorizeBar({
               </h3>
             </div>
 
+            {/* Title input - full width, positioned first */}
+            <div className="mb-4">
+              <label
+                className="mb-1.5 block text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+              >
+                Title
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Optional — give this note a name"
+                className="w-full rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] transition-colors placeholder:text-[var(--ink-soft)] focus:border-[var(--accent)] focus:outline-none"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              />
+            </div>
+
             {/* Type toggle row */}
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex overflow-hidden rounded-[var(--radius)] border border-[var(--line)]">
+              <div className="flex gap-2">
                 <button
                   onClick={() => setType(type === "meeting" ? null : "meeting")}
                   data-state={type === "meeting" ? "selected" : "unselected"}
-                  className="cursor-pointer px-4 py-2 text-sm font-medium transition-colors data-[state=selected]:bg-[var(--accent)] data-[state=selected]:text-white data-[state=unselected]:bg-[var(--paper)] data-[state=unselected]:text-[var(--ink-soft)] data-[state=unselected]:hover:bg-[var(--accent-soft)]"
+                  className="cursor-pointer rounded-[var(--radius)] border px-4 py-2 text-sm font-medium transition-colors data-[state=selected]:border-[var(--accent)] data-[state=selected]:bg-[var(--accent)] data-[state=selected]:text-white data-[state=unselected]:border-[var(--line)] data-[state=unselected]:bg-transparent data-[state=unselected]:text-[var(--ink-soft)] data-[state=unselected]:hover:border-[var(--accent)] data-[state=unselected]:hover:bg-[var(--accent-soft)]"
                   style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                 >
                   Meeting
@@ -235,7 +257,7 @@ export function CategorizeBar({
                 <button
                   onClick={() => setType(type === "general" ? null : "general")}
                   data-state={type === "general" ? "selected" : "unselected"}
-                  className="cursor-pointer px-4 py-2 text-sm font-medium transition-colors data-[state=selected]:bg-[var(--purple)] data-[state=selected]:text-white data-[state=unselected]:bg-[var(--paper)] data-[state=unselected]:text-[var(--ink-soft)] data-[state=unselected]:hover:bg-[var(--purple-soft)]"
+                  className="cursor-pointer rounded-[var(--radius)] border px-4 py-2 text-sm font-medium transition-colors data-[state=selected]:border-[var(--purple)] data-[state=selected]:bg-[var(--purple)] data-[state=selected]:text-white data-[state=unselected]:border-[var(--line)] data-[state=unselected]:bg-transparent data-[state=unselected]:text-[var(--ink-soft)] data-[state=unselected]:hover:border-[var(--purple)] data-[state=unselected]:hover:bg-[var(--purple-soft)]"
                   style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                 >
                   General
@@ -261,17 +283,17 @@ export function CategorizeBar({
                 disabled={isLoadingProjects}
               />
 
-              {/* Topic or Meeting */}
+              {/* Topic */}
               <AutocompleteInput
                 value={topicInput}
                 onChange={setTopicInput}
                 options={topics}
                 placeholder={
                   type === "meeting"
-                    ? "e.g. Stakeholder sync"
-                    : "e.g. Requirements analysis"
+                    ? "e.g. Stakeholder sync — optional, defaults to 'General meeting'"
+                    : "e.g. Requirements analysis — optional, defaults to 'General'"
                 }
-                label={type === "meeting" ? "Meeting or topic?" : "Topic?"}
+                label="Topic"
                 disabled={!projectInput}
               />
             </div>

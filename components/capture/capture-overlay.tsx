@@ -10,6 +10,7 @@ import { pendingSavesManager } from "@/lib/pending-saves";
 import { CategorizeBar } from "./categorize-bar";
 import { Kbd } from "@/components/ui/kbd";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 /**
  * Full-screen capture overlay for writing notes.
@@ -25,19 +26,93 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
  * - Layer 2: Client-side UUID generation + retry with exponential backoff + network-aware background retries
  */
 export function CaptureOverlay() {
-  const { isOpen, initialText, initialId, closeCapture } = useCaptureOverlay();
+  const { isOpen, initialText, initialId, prefilledContext, closeCapture } =
+    useCaptureOverlay();
   const queryClient = useQueryClient();
   const [noteId, setNoteId] = useState<string>("");
   const [text, setText] = useState("");
+  const [title, setTitle] = useState("");
   const [showCategorize, setShowCategorize] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "failed" | "retrying"
   >("idle");
   const [saveError, setSaveError] = useState<string>("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initializedRef = useRef(false);
+
+  // NEW: Save with prefilled context (skip categorize bar)
+  // Defined early so it can be used in useEffect hooks
+  const handleSaveWithContext = useCallback(async () => {
+    if (!text.trim() || !noteId || !prefilledContext) {
+      closeCapture();
+      return;
+    }
+
+    setSaveStatus("saving");
+
+    try {
+      await retryWithBackoff(
+        async () => {
+          const response = await fetch("/api/notes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: noteId,
+              text: text.trim(),
+              title: title || null,
+              type: prefilledContext.type,
+              meeting_id: prefilledContext.meetingId || null,
+              topic_id: prefilledContext.topicId || null,
+              is_unsorted: false, // Prefilled context means it's already categorized
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to save note");
+          }
+
+          return response.json();
+        },
+        {
+          maxAttempts: 3,
+          onRetry: (attempt, error) => {
+            console.log(
+              `Retry attempt ${attempt} for note ${noteId}:`,
+              error.message,
+            );
+            setSaveStatus("retrying");
+          },
+        },
+      );
+
+      // Success! Clear the draft and close
+      clearDraft();
+      setSaveStatus("saved");
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+      closeCapture();
+    } catch (error) {
+      // All retries failed - add to pending queue for background retry
+      console.error("Failed to save note after retries:", error);
+      setSaveStatus("failed");
+      setSaveError(error instanceof Error ? error.message : "Unknown error");
+
+      pendingSavesManager.addPending({
+        id: noteId,
+        text: text.trim(),
+        type: prefilledContext.type,
+        meetingId: prefilledContext.meetingId,
+        topicId: prefilledContext.topicId,
+        isUnsorted: false,
+        timestamp: Date.now(),
+        attemptCount: 3,
+      });
+
+      // Don't close or clear the draft - keep it for recovery
+    }
+  }, [text, noteId, prefilledContext, title, closeCapture, queryClient]);
 
   // Generate or restore note ID when overlay opens
   useEffect(() => {
@@ -103,26 +178,25 @@ export function CaptureOverlay() {
 
   // Focus textarea when overlay opens or when returning from categorize bar
   useEffect(() => {
-    if (isOpen && !showCategorize && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isOpen, showCategorize]);
-
-  // Handle Cmd/Ctrl+Enter to show categorize bar
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen || showCategorize) return;
 
-      // Cmd/Ctrl + Enter to show categorize bar
+      // Cmd/Ctrl + Enter to finish
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        setShowCategorize(true);
+
+        // If we have prefilled context, save directly without showing categorize bar
+        if (prefilledContext) {
+          handleSaveWithContext();
+        } else {
+          setShowCategorize(true);
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, showCategorize]);
+  }, [isOpen, showCategorize, prefilledContext, handleSaveWithContext]);
 
   // Reset state when overlay closes OR initialize text when it opens with initialText
   useEffect(() => {
@@ -136,6 +210,7 @@ export function CaptureOverlay() {
     } else {
       // Closing - reset everything
       setText("");
+      setTitle("");
       setNoteId("");
       setShowCategorize(false);
       setSaveStatus("idle");
@@ -191,6 +266,7 @@ export function CaptureOverlay() {
 
   // Save the note with categorization (with automatic retry)
   const handleSave = async (data: {
+    title?: string;
     type: "meeting" | "general";
     projectId?: string;
     topicId?: string;
@@ -200,6 +276,11 @@ export function CaptureOverlay() {
     if (!text.trim() || !noteId) {
       closeCapture();
       return;
+    }
+
+    // Store title for when user goes back to editing
+    if (data.title !== undefined) {
+      setTitle(data.title);
     }
 
     setSaveStatus("saving");
@@ -220,6 +301,7 @@ export function CaptureOverlay() {
             body: JSON.stringify({
               id: noteId,
               text: text.trim(),
+              title: data.title || null,
               // Keep the type the user selected, but clear the IDs if unsorted
               type: data.type,
               meeting_id: shouldBeUnsorted ? null : data.meetingId || null,
@@ -305,6 +387,13 @@ export function CaptureOverlay() {
               is_unsorted: true,
             }),
           });
+          {
+            prefilledContext && (
+              <span className="ml-2 text-[var(--accent)]">
+                → saves directly to this meeting
+              </span>
+            );
+          }
 
           if (!response.ok) {
             const errorData = await response.json();
@@ -376,6 +465,11 @@ export function CaptureOverlay() {
                   <>
                     <Kbd className="mr-2">⌘⏎</Kbd>
                     to finish
+                    {prefilledContext && (
+                      <span className="ml-2 text-[var(--accent)]">
+                        → saves directly to this meeting
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -393,29 +487,27 @@ export function CaptureOverlay() {
               )}
             </div>
 
-            {/* Full-screen textarea */}
+            {/* Full-screen rich text editor */}
             <div
               className="flex flex-1 justify-center overflow-y-auto px-10"
               onClick={showCategorize ? handleBack : undefined}
             >
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Start typing — figure out where it goes later…"
-                disabled={
-                  showCategorize ||
-                  saveStatus === "saving" ||
-                  saveStatus === "retrying"
-                }
-                className={`h-full w-full max-w-3xl resize-none border-none bg-transparent text-xl leading-relaxed text-[var(--ink)] outline-none placeholder:text-[var(--ink-soft)] disabled:opacity-50 ${
-                  showCategorize ? "pointer-events-none" : ""
+              <div
+                className={`w-full max-w-3xl ${
+                  showCategorize ? "pointer-events-none opacity-50" : ""
                 }`}
                 style={{
-                  fontFamily: "var(--font-source-serif)",
                   paddingTop: "6vh",
                 }}
-              />
+              >
+                <RichTextEditor
+                  content={text}
+                  onChange={setText}
+                  placeholder="Start typing — figure out where it goes later…"
+                  autofocus={!showCategorize}
+                  className="text-xl"
+                />
+              </div>
             </div>
 
             {/* Save status indicator */}
@@ -478,18 +570,21 @@ export function CaptureOverlay() {
         variant="danger"
       />
 
-      {/* Categorize bar (slides up from bottom) */}
-      <CategorizeBar
-        isOpen={
-          showCategorize &&
-          saveStatus !== "saving" &&
-          saveStatus !== "retrying" &&
-          saveStatus !== "failed"
-        }
-        onSave={handleSave}
-        onSkip={handleSkip}
-        onBack={handleBack}
-      />
+      {/* Categorize bar - shown only when user hits Cmd+Enter AND no prefilled context */}
+      {!prefilledContext && (
+        <CategorizeBar
+          isOpen={
+            showCategorize &&
+            saveStatus !== "saving" &&
+            saveStatus !== "retrying" &&
+            saveStatus !== "failed"
+          }
+          initialTitle={title}
+          onSave={handleSave}
+          onSkip={handleSkip}
+          onBack={handleBack}
+        />
+      )}
     </>
   );
 }

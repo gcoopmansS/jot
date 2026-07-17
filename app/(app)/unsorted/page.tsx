@@ -63,7 +63,7 @@ export default function UnsortedPage() {
             <div className="space-y-4">
               <AnimatePresence>
                 {notes.map((note) => (
-                  <NoteCard key={note.id} note={note} />
+                  <NoteCard key={note.id} note={note} viewContext="unsorted" />
                 ))}
               </AnimatePresence>
             </div>

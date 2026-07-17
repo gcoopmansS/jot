@@ -4,11 +4,11 @@ import { AppHeader } from "@/components/app-header/app-header";
 import { NoteCard } from "@/components/note-card/note-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingPage } from "@/components/ui/loading";
-import { MeetingStack } from "@/components/meeting-stack/meeting-stack";
-import { Calendar } from "lucide-react";
+import { SeriesBanner } from "@/components/series-banner/series-banner";
+import { Calendar, Repeat } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import type { Note, Meeting } from "@/lib/types";
+import type { Note, Meeting, Project } from "@/lib/types";
 import { AnimatePresence } from "framer-motion";
 
 /**
@@ -20,6 +20,17 @@ import { AnimatePresence } from "framer-motion";
 export default function MeetingPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
+  const projectId = params.id as string;
+
+  // Fetch the project for breadcrumb
+  const { data: project } = useQuery<Project>({
+    queryKey: ["project", projectId],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) throw new Error("Failed to fetch project");
+      return response.json();
+    },
+  });
 
   // Fetch the meeting
   const { data: meeting, isLoading: meetingLoading } = useQuery<Meeting>({
@@ -81,30 +92,34 @@ export default function MeetingPage() {
       <AppHeader
         title={
           <>
-            {meeting.name}
-            {meeting.recurring && (
+            {project && (
               <span
-                className="ml-2 text-sm"
-                style={{ color: "var(--accent)" }}
-                title="Recurring meeting"
+                className="font-normal"
+                style={{ color: "var(--ink-soft)" }}
               >
-                ↻
+                {project.name} /{" "}
               </span>
             )}
+            <span className="inline-flex items-center gap-2">
+              {meeting.name}
+              {meeting.recurring && (
+                <Repeat
+                  className="h-4 w-4"
+                  style={{ color: "var(--accent)" }}
+                />
+              )}
+            </span>
           </>
         }
       />
       <div className="flex-1 px-10 py-6">
         <div className="max-w-3xl mx-auto">
-          {/* Show recurring meeting stack for recurring meetings */}
-          {meeting.recurring && notes.length > 0 && (
-            <MeetingStack
-              meetingName={meeting.name}
-              cadence={meeting.cadence}
-              attendees={meeting.attendees}
-              lastNote={notes[0]} // Most recent note (sorted descending)
-            />
-          )}
+          {/* Series banner - shown for all meetings to handle recurring state */}
+          <SeriesBanner
+            meeting={meeting}
+            lastNote={notes.length > 0 ? notes[0] : null}
+            projectId={projectId}
+          />
 
           {notesLoading ? (
             <LoadingPage />
@@ -118,7 +133,7 @@ export default function MeetingPage() {
             <div className="space-y-4">
               <AnimatePresence>
                 {notes.map((note) => (
-                  <NoteCard key={note.id} note={note} />
+                  <NoteCard key={note.id} note={note} viewContext="specific" />
                 ))}
               </AnimatePresence>
             </div>

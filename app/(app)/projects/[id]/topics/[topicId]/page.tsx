@@ -7,7 +7,7 @@ import { LoadingPage } from "@/components/ui/loading";
 import { BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import type { Note, NoteTopic } from "@/lib/types";
+import type { Note, NoteTopic, Project } from "@/lib/types";
 import { AnimatePresence } from "framer-motion";
 
 /**
@@ -19,6 +19,17 @@ import { AnimatePresence } from "framer-motion";
 export default function TopicPage() {
   const params = useParams();
   const topicId = params.topicId as string;
+  const projectId = params.id as string;
+
+  // Fetch the project for breadcrumb
+  const { data: project } = useQuery<Project>({
+    queryKey: ["project", projectId],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) throw new Error("Failed to fetch project");
+      return response.json();
+    },
+  });
 
   // Fetch the topic
   const { data: topic, isLoading: topicLoading } = useQuery<NoteTopic>({
@@ -77,7 +88,21 @@ export default function TopicPage() {
 
   return (
     <>
-      <AppHeader title={topic.name} />
+      <AppHeader
+        title={
+          <>
+            {project && (
+              <span
+                className="font-normal"
+                style={{ color: "var(--ink-soft)" }}
+              >
+                {project.name} /{" "}
+              </span>
+            )}
+            {topic.name}
+          </>
+        }
+      />
       <div className="flex-1 px-10 py-6">
         {notesLoading ? (
           <LoadingPage />
@@ -93,7 +118,7 @@ export default function TopicPage() {
           <div className="max-w-3xl mx-auto space-y-4">
             <AnimatePresence>
               {notes.map((note) => (
-                <NoteCard key={note.id} note={note} />
+                <NoteCard key={note.id} note={note} viewContext="specific" />
               ))}
             </AnimatePresence>
           </div>

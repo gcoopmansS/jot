@@ -9,6 +9,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { CategorizeBar } from "@/components/capture/categorize-bar";
 import { retryWithBackoff } from "@/lib/retry";
 import { pendingSavesManager } from "@/lib/pending-saves";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 /**
  * Note detail page - shows a single note in full-screen editable view.
@@ -29,13 +30,13 @@ export default function NotePage() {
   const shouldShowFilePrompt = searchParams.get("file") === "true";
 
   const [text, setText] = useState("");
+  const [title, setTitle] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
   const [showCategorize, setShowCategorize] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "retrying" | "failed"
   >("idle");
   const [saveError, setSaveError] = useState<string>("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -55,6 +56,7 @@ export default function NotePage() {
   useEffect(() => {
     if (note) {
       setText(note.text);
+      setTitle(note.title || "");
       // Auto-show categorize bar if this is an unsorted note or if ?file=true
       if (note.is_unsorted || shouldShowFilePrompt) {
         setShowCategorize(true);
@@ -62,12 +64,7 @@ export default function NotePage() {
     }
   }, [note, shouldShowFilePrompt]);
 
-  // Focus textarea when page loads (but not when categorize bar is shown)
-  useEffect(() => {
-    if (textareaRef.current && !isLoading && !showCategorize) {
-      textareaRef.current.focus();
-    }
-  }, [isLoading, showCategorize]);
+  // Note: RichTextEditor handles autofocus via its autofocus prop
 
   // Listen for save status changes from the pending saves manager (for background retries)
   useEffect(() => {
@@ -189,18 +186,25 @@ export default function NotePage() {
 
   // Handle categorization from the categorize bar
   const handleCategorize = async (data: {
+    title?: string;
     type: "meeting" | "general";
     projectId?: string;
     topicId?: string;
     meetingId?: string;
     isUnsorted?: boolean;
   }) => {
+    // Store title for when user goes back to editing
+    if (data.title !== undefined) {
+      setTitle(data.title);
+    }
+
     // Update the note with categorization
     try {
       const response = await fetch(`/api/notes/${noteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: data.title || null,
           type: data.type,
           meeting_id: data.meetingId || null,
           topic_id: data.topicId || null,
@@ -232,11 +236,8 @@ export default function NotePage() {
   };
 
   const handleBackFromCategorize = () => {
-    // Return to editing
+    // Return to editing (RichTextEditor will autofocus)
     setShowCategorize(false);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
   };
 
   // Debounced autosave: save 1.5 seconds after user stops typing
@@ -366,21 +367,21 @@ export default function NotePage() {
         </button>
       </div>
 
-      {/* Full-screen textarea */}
+      {/* Full-screen rich text editor */}
       <div className="flex-1 flex justify-center px-10 overflow-y-auto">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => handleTextChange(e.target.value)}
-          onBlur={handleSave}
-          disabled={saveStatus === "saving" || saveStatus === "retrying"}
-          className="w-full max-w-3xl h-full resize-none bg-transparent border-none outline-none text-xl leading-relaxed disabled:opacity-50"
+        <div
+          className="w-full max-w-3xl"
           style={{
-            fontFamily: "var(--font-source-serif)",
-            color: "var(--ink)",
             paddingTop: "6vh",
           }}
-        />
+        >
+          <RichTextEditor
+            content={text}
+            onChange={handleTextChange}
+            autofocus={!showCategorize && !isLoading}
+            className="text-xl"
+          />
+        </div>
       </div>
 
       {/* Save status indicator */}
@@ -427,6 +428,7 @@ export default function NotePage() {
       {/* Categorize bar for unsorted notes */}
       <CategorizeBar
         isOpen={showCategorize}
+        initialTitle={title}
         onSave={handleCategorize}
         onSkip={handleSkipCategorize}
         onBack={handleBackFromCategorize}

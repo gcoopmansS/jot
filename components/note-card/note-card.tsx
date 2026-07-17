@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2, ArrowRight } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Note } from "@/lib/types";
+import { Note, NoteWithLocation } from "@/lib/types";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,30 +12,73 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
 /**
+ * Strip markdown formatting characters from text for clean previews.
+ * Converts: **bold** → bold, *italic* → italic, # Heading → Heading, etc.
+ */
+function stripMarkdown(text: string): string {
+  return (
+    text
+      // Remove headings (# ## ###)
+      .replace(/^#{1,6}\s+/gm, "")
+      // Remove bold (**text** or __text__)
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/__(.+?)__/g, "$1")
+      // Remove italic (*text* or _text_)
+      .replace(/\*(.+?)\*/g, "$1")
+      .replace(/_(.+?)_/g, "$1")
+      // Remove inline code (`code`)
+      .replace(/`(.+?)`/g, "$1")
+      // Remove links [text](url) → text
+      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+      // Remove blockquote markers (>)
+      .replace(/^>\s+/gm, "")
+      // Remove list markers (-, *, +, 1.)
+      .replace(/^[\s]*[-*+]\s+/gm, "")
+      .replace(/^[\s]*\d+\.\s+/gm, "")
+      // Remove horizontal rules (---, ***, ___)
+      .replace(/^[-*_]{3,}$/gm, "")
+      // Clean up multiple spaces
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+}
+
+/**
  * NoteCard component - displays a single note in a list view.
  *
- * Shows:
- * - Type badge (MEETING or GENERAL) using Badge component
- * - Timestamp in uppercase IBM Plex Mono format (JAN 15, 2026)
- * - Preview text in Source Serif 4 (signals "this is note content")
- * - "File this →" button for unsorted notes
- * - Delete button (Trash2 icon, visible on hover)
+ * Context-aware display:
+ * - In specific meeting/topic views: hides type badge and location (redundant with breadcrumb)
+ * - In mixed views (Everything): shows type badge and location tag
+ * - In unsorted view: shows type badge if type was selected, shows "File this →" button
  *
- * Hover state: border color shifts from --line to --ink-soft
+ * Always shows: title (if present), snippet, timestamp, delete button on hover
+ * Hover state: border color shifts from --line to --accent
  * Click: navigates to note detail page for editing
  */
 interface NoteCardProps {
-  note: Note;
+  note: Note | NoteWithLocation;
   onClick?: () => void;
+  /** View context for conditional rendering */
+  viewContext?: "specific" | "mixed" | "unsorted";
 }
 
-export function NoteCard({ note, onClick }: NoteCardProps) {
+export function NoteCard({
+  note,
+  onClick,
+  viewContext = "specific",
+}: NoteCardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Mutation for deleting a note
+  // Type guard to check if note has location data
+  const noteWithLocation = note as NoteWithLocation;
+  const hasLocation =
+    noteWithLocation.project_name && noteWithLocation.location_name;
+
+  // Mutation for deleting a note with automatic cleanup
   const deleteMutation = useMutation({
     mutationFn: async (noteId: string) => {
       const response = await fetch(`/api/notes/${noteId}`, {
@@ -46,14 +89,53 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: {
+      success: boolean;
+      cleanup?: {
+        deletedMeetingId: string | null;
+        deletedTopicId: string | null;
+      };
+    }) => {
       // Invalidate queries immediately - AnimatePresence will handle the exit animation
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["unsorted-notes"] });
       queryClient.invalidateQueries({ queryKey: ["meeting-notes"] });
       queryClient.invalidateQueries({ queryKey: ["topic-notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+      // CRITICAL: Also invalidate meetings and topics so sidebar updates when containers are auto-deleted
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["topics"] });
       setShowDeleteDialog(false);
+
+      // Check if we need to redirect due to automatic cleanup
+      if (data.cleanup) {
+        const { deletedMeetingId, deletedTopicId } = data.cleanup;
+
+        // Parse current path to check if we're viewing the deleted container
+        const meetingMatch = pathname?.match(
+          /\/projects\/([^/]+)\/meetings\/([^/]+)/,
+        );
+        const topicMatch = pathname?.match(
+          /\/projects\/([^/]+)\/topics\/([^/]+)/,
+        );
+
+        let shouldRedirect = false;
+        let redirectPath = "/everything"; // Default fallback
+
+        if (deletedMeetingId && meetingMatch?.[2] === deletedMeetingId) {
+          // We're viewing the meeting that just got deleted - redirect to parent project
+          shouldRedirect = true;
+          redirectPath = `/projects/${meetingMatch[1]}`;
+        } else if (deletedTopicId && topicMatch?.[2] === deletedTopicId) {
+          // We're viewing the topic that just got deleted - redirect to parent project
+          shouldRedirect = true;
+          redirectPath = `/projects/${topicMatch[1]}`;
+        }
+
+        if (shouldRedirect) {
+          router.push(redirectPath);
+        }
+      }
     },
   });
 
@@ -67,9 +149,44 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
     .replace(",", "")
     .toUpperCase();
 
-  // Get first line or first ~150 chars for preview
-  const previewText = note.text.split("\n")[0].slice(0, 150);
-  const isLong = note.text.length > 150;
+  // Generate preview text based on whether title exists
+  const generatePreview = () => {
+    // Skip leading blank lines
+    const lines = note.text.split("\n");
+    const firstNonEmptyLine = lines.find((line) => line.trim()) || "";
+
+    // Strip markdown formatting for clean preview
+    const cleanText = stripMarkdown(firstNonEmptyLine);
+
+    if (note.title) {
+      // If there's a title, show a short one-line snippet of the body
+      const snippet = cleanText.slice(0, 80);
+      const cutAtWordBoundary =
+        snippet.length < cleanText.length
+          ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
+          : snippet;
+      return {
+        hasTitle: true,
+        title: note.title,
+        snippet: cutAtWordBoundary,
+        needsEllipsis: cleanText.length > 80,
+      };
+    } else {
+      // No title: show a longer snippet (up to 150 chars), cut at word boundary
+      const snippet = cleanText.slice(0, 150);
+      const cutAtWordBoundary =
+        snippet.length < cleanText.length
+          ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
+          : snippet;
+      return {
+        hasTitle: false,
+        snippet: cutAtWordBoundary,
+        needsEllipsis: cleanText.length > 150,
+      };
+    }
+  };
+
+  const preview = generatePreview();
 
   const handleClick = () => {
     if (onClick) {
@@ -125,12 +242,27 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
         )}
         style={{ boxShadow: "var(--shadow-card)" }}
       >
-        {/* Header: Type badge + timestamp + delete button */}
-        <div className="mb-3 flex items-center justify-between">
-          <Badge variant={note.type === "meeting" ? "meeting" : "general"}>
-            {note.type}
-          </Badge>
-          <div className="flex items-center gap-2">
+        {/* Header: Type badge + location tag + timestamp + delete button */}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {/* Show type badge in mixed views or unsorted view (when type was selected) */}
+            {viewContext === "mixed" && (
+              <Badge variant={note.type === "meeting" ? "meeting" : "general"}>
+                {note.type}
+              </Badge>
+            )}
+            {/* Show location tag in mixed views */}
+            {viewContext === "mixed" && hasLocation && (
+              <span
+                className="text-xs text-[var(--ink-soft)] truncate"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              >
+                {noteWithLocation.project_name} /{" "}
+                {noteWithLocation.location_name}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <span
               className="text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
               style={{
@@ -153,16 +285,35 @@ export function NoteCard({ note, onClick }: NoteCardProps) {
           </div>
         </div>
 
-        {/* Note preview text - in Source Serif 4 to signal this is content */}
-        <p
-          className="text-base leading-relaxed text-[var(--ink)]"
-          style={{
-            fontFamily: "var(--font-source-serif)",
-          }}
-        >
-          {previewText}
-          {isLong && "..."}
-        </p>
+        {/* Note content - title (if present) + snippet */}
+        {preview.hasTitle && (
+          <h3
+            className="mb-2 text-lg font-semibold leading-snug text-[var(--ink)]"
+            style={{
+              fontFamily: "var(--font-source-serif)",
+            }}
+          >
+            {preview.title}
+          </h3>
+        )}
+        {/* Snippet - always shown, properly truncated to 2 lines */}
+        {preview.snippet && (
+          <p
+            className="text-base leading-relaxed"
+            style={{
+              fontFamily: "var(--font-source-serif)",
+              color: preview.hasTitle ? "var(--ink-soft)" : "var(--ink)",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              overflowWrap: "break-word",
+              wordBreak: "break-word",
+            }}
+          >
+            {preview.snippet}
+          </p>
+        )}
 
         {/* File this button for unsorted notes */}
         {note.is_unsorted && (

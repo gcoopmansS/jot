@@ -6,18 +6,26 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingPage } from "@/components/ui/loading";
 import { FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { Note } from "@/lib/types";
+import type {
+  Note,
+  NoteWithLocation,
+  Project,
+  Meeting,
+  NoteTopic,
+} from "@/lib/types";
 import { AnimatePresence } from "framer-motion";
+import { useMemo } from "react";
 
 /**
  * Everything page - shows all notes across all projects.
  *
  * A chronological or searchable view of every note the user has written,
  * regardless of project or filing status.
+ * Shows type badges and location tags since items are mixed.
  */
 export default function EverythingPage() {
   // Fetch all notes
-  const { data: notes = [], isLoading } = useQuery<Note[]>({
+  const { data: notes = [], isLoading: notesLoading } = useQuery<Note[]>({
     queryKey: ["notes"],
     queryFn: async () => {
       const response = await fetch("/api/notes");
@@ -31,13 +39,70 @@ export default function EverythingPage() {
     },
   });
 
+  // Fetch projects for location enrichment
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects"],
+    queryFn: async () => {
+      const response = await fetch("/api/projects");
+      if (!response.ok) throw new Error("Failed to fetch projects");
+      return response.json();
+    },
+  });
+
+  // Fetch meetings for location enrichment
+  const { data: meetings = [] } = useQuery<Meeting[]>({
+    queryKey: ["meetings"],
+    queryFn: async () => {
+      const response = await fetch("/api/meetings");
+      if (!response.ok) throw new Error("Failed to fetch meetings");
+      return response.json();
+    },
+  });
+
+  // Fetch topics for location enrichment
+  const { data: topics = [] } = useQuery<NoteTopic[]>({
+    queryKey: ["topics"],
+    queryFn: async () => {
+      const response = await fetch("/api/topics");
+      if (!response.ok) throw new Error("Failed to fetch topics");
+      return response.json();
+    },
+  });
+
+  // Enrich notes with location information
+  const enrichedNotes = useMemo<NoteWithLocation[]>(() => {
+    return notes.map((note) => {
+      // Find the meeting or topic
+      const meeting = note.meeting_id
+        ? meetings.find((m) => m.id === note.meeting_id)
+        : null;
+      const topic = note.topic_id
+        ? topics.find((t) => t.id === note.topic_id)
+        : null;
+
+      // Find the project
+      const projectId = meeting?.project_id || topic?.project_id;
+      const project = projectId
+        ? projects.find((p) => p.id === projectId)
+        : null;
+
+      return {
+        ...note,
+        project_name: project?.name,
+        location_name: meeting?.name || topic?.name,
+      };
+    });
+  }, [notes, projects, meetings, topics]);
+
+  const isLoading = notesLoading;
+
   return (
     <>
       <AppHeader title="Everything" />
       <div className="flex-1 px-10 py-6">
         {isLoading ? (
           <LoadingPage />
-        ) : notes.length === 0 ? (
+        ) : enrichedNotes.length === 0 ? (
           <div className="max-w-3xl mx-auto">
             <EmptyState
               icon={FileText}
@@ -48,8 +113,8 @@ export default function EverythingPage() {
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">
             <AnimatePresence>
-              {notes.map((note) => (
-                <NoteCard key={note.id} note={note} />
+              {enrichedNotes.map((note) => (
+                <NoteCard key={note.id} note={note} viewContext="mixed" />
               ))}
             </AnimatePresence>
           </div>
