@@ -45,6 +45,8 @@ interface RichTextEditorProps {
   className?: string;
   /** Called when editor is ready and focused */
   onReady?: () => void;
+  /** Called when user presses Cmd+Enter (or Ctrl+Enter) to save */
+  onSave?: () => void;
 }
 
 // Helper function to get markdown from editor
@@ -155,6 +157,7 @@ export function RichTextEditor({
   autofocus = true,
   className,
   onReady,
+  onSave,
 }: RichTextEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
@@ -267,6 +270,19 @@ export function RichTextEditor({
             "prose prose-sm max-w-none focus:outline-none",
             "min-h-[200px] w-full",
           ),
+        },
+        handleKeyDown: (view, event) => {
+          // Handle Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux) to trigger save
+          if (
+            onSave &&
+            (event.metaKey || event.ctrlKey) &&
+            event.key === "Enter"
+          ) {
+            event.preventDefault();
+            onSave();
+            return true;
+          }
+          return false;
         },
       },
       onUpdate: ({ editor }) => {

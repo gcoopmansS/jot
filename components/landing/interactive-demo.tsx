@@ -842,7 +842,7 @@ export function InteractiveDemo() {
                   onChange={setCaptureText}
                   placeholder="Start writing..."
                   onSave={handleFinishCapture}
-                  autoFocus
+                  autofocus
                 />
               </div>
             </div>
