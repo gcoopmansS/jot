@@ -3,6 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "./button";
+import { ReactNode } from "react";
 
 /**
  * Confirmation dialog for destructive actions.
@@ -15,11 +16,12 @@ type ConfirmDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  description: string;
+  description: string | ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
   variant?: "danger" | "default";
+  disabled?: boolean;
 };
 
 export function ConfirmDialog({
@@ -31,6 +33,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   onConfirm,
   variant = "danger",
+  disabled = false,
 }: ConfirmDialogProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -72,6 +75,7 @@ export function ConfirmDialog({
                 onConfirm();
                 onOpenChange(false);
               }}
+              disabled={disabled}
               className={
                 variant === "danger"
                   ? "bg-red-600 hover:bg-red-700 focus-visible:ring-red-600"
