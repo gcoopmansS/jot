@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
+// Force dynamic rendering to avoid prerender errors with useSearchParams
+export const dynamic = "force-dynamic";
+
 /**
  * Sign-in/sign-up page for the Jot app.
  *
