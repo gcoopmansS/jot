@@ -7,6 +7,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
+import { Analytics } from "@vercel/analytics/react";
 
 // Fonts matching Jot's design language
 // Space Grotesk: headings and UI chrome (though mostly not used in prototype)
@@ -52,6 +53,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>{children}</QueryProvider>
+        <Analytics />
       </body>
     </html>
   );
