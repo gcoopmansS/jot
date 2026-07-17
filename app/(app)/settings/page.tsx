@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -19,15 +19,44 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
  */
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   // Email update state
+  const [currentEmail, setCurrentEmail] = useState<string>("");
   const [newEmail, setNewEmail] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
   const [emailStatus, setEmailStatus] = useState<{
     type: "success" | "error" | null;
     message: string;
   }>({ type: null, message: "" });
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+
+  // Fetch current user email on mount
+  useEffect(() => {
+    const fetchUserEmail = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) {
+        setCurrentEmail(user.email);
+      }
+    };
+    fetchUserEmail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Check for email confirmation success on page load
+  useEffect(() => {
+    if (searchParams.get("emailConfirmed") === "true") {
+      setEmailStatus({
+        type: "success",
+        message: "Your email address has been successfully updated!",
+      });
+      // Clean up the URL parameter
+      router.replace("/settings");
+    }
+  }, [searchParams, router]);
 
   // Password update state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -60,17 +89,56 @@ export default function SettingsPage() {
   const handleUpdateEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailStatus({ type: null, message: "" });
+
+    // Validate emails match
+    if (newEmail !== confirmEmail) {
+      setEmailStatus({
+        type: "error",
+        message: "Email addresses do not match.",
+      });
+      return;
+    }
+
+    // Validate email is different from current
+    if (newEmail === currentEmail) {
+      setEmailStatus({
+        type: "error",
+        message: "New email is the same as your current email.",
+      });
+      return;
+    }
+
     setIsUpdatingEmail(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        email: newEmail,
-      });
+      // Get the current site URL for the redirect
+      const siteUrl =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+      const { error } = await supabase.auth.updateUser(
+        {
+          email: newEmail,
+        },
+        {
+          emailRedirectTo: `${siteUrl}/auth/callback?next=/settings?emailConfirmed=true`,
+        },
+      );
 
       if (error) {
+        // Provide more helpful message for rate limit errors
+        let errorMessage = error.message;
+        if (
+          error.message.includes("rate") ||
+          error.message.includes("too many")
+        ) {
+          errorMessage =
+            "Too many email change requests. Please wait a few minutes and try again.";
+        }
         setEmailStatus({
           type: "error",
-          message: error.message,
+          message: errorMessage,
         });
       } else {
         setEmailStatus({
@@ -79,6 +147,7 @@ export default function SettingsPage() {
             "Check your new email address for a confirmation link to complete the change.",
         });
         setNewEmail("");
+        setConfirmEmail("");
       }
     } catch (error) {
       setEmailStatus({
@@ -116,9 +185,7 @@ export default function SettingsPage() {
     setIsUpdatingPassword(true);
 
     try {
-      // Supabase doesn't natively require the old password for password updates
-      // when the user is already authenticated, but we can verify the current
-      // password by trying to sign in with it first
+      // Get current user email for verification
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -133,6 +200,8 @@ export default function SettingsPage() {
       }
 
       // Verify current password by attempting to sign in
+      // This is a security measure to ensure the person changing the password
+      // is the actual account owner (not someone who found an unlocked device)
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
@@ -147,7 +216,7 @@ export default function SettingsPage() {
         return;
       }
 
-      // Update to new password
+      // Current password verified, now update to new password
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -240,6 +309,23 @@ export default function SettingsPage() {
             to confirm the new address via email.
           </p>
 
+          {currentEmail && (
+            <div className="mt-4 rounded-md bg-[var(--paper)] px-4 py-3">
+              <p
+                className="text-[11px] uppercase tracking-wider text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+              >
+                Current Email
+              </p>
+              <p
+                className="mt-1 text-sm text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              >
+                {currentEmail}
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleUpdateEmail} className="mt-6 space-y-4">
             <div>
               <label
@@ -260,6 +346,25 @@ export default function SettingsPage() {
               />
             </div>
 
+            <div>
+              <label
+                htmlFor="confirm-email"
+                className="mb-1.5 block text-[11px] uppercase tracking-wider text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+              >
+                Confirm New Email Address
+              </label>
+              <Input
+                id="confirm-email"
+                type="email"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="bg-white"
+              />
+            </div>
+
             {emailStatus.type && (
               <div
                 className={`rounded-[var(--radius)] border px-4 py-3 text-sm ${
@@ -273,7 +378,10 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <Button type="submit" disabled={isUpdatingEmail || !newEmail}>
+            <Button
+              type="submit"
+              disabled={isUpdatingEmail || !newEmail || !confirmEmail}
+            >
               {isUpdatingEmail ? "Updating..." : "Update Email"}
             </Button>
           </form>
@@ -293,8 +401,8 @@ export default function SettingsPage() {
             className="mt-1 text-sm text-[var(--ink-soft)]"
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
           >
-            Change your account password. You'll need to enter your current
-            password to confirm.
+            Change your account password. You'll need to verify your current
+            password for security.
           </p>
 
           <form onSubmit={handleUpdatePassword} className="mt-6 space-y-4">
