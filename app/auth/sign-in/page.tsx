@@ -2,10 +2,7 @@
 
 import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
-
-// Force dynamic rendering to avoid prerender errors with useSearchParams
-export const dynamic = "force-dynamic";
+import { useState, useEffect, Suspense } from "react";
 
 /**
  * Sign-in/sign-up page for the Jot app.
@@ -18,7 +15,9 @@ export const dynamic = "force-dynamic";
  *
  * Supports ?mode=sign-up URL parameter to default to sign-up mode.
  */
-export default function AuthPage() {
+
+// Internal component that uses useSearchParams - must be wrapped in Suspense
+function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -235,5 +234,20 @@ export default function AuthPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+// Export wrapped in Suspense to handle useSearchParams
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[var(--paper)]">
+          <div className="text-[var(--ink-soft)]">Loading...</div>
+        </div>
+      }
+    >
+      <AuthForm />
+    </Suspense>
   );
 }
