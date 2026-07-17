@@ -378,6 +378,7 @@ export default function NotePage() {
           <RichTextEditor
             content={text}
             onChange={handleTextChange}
+            onSave={handleClose}
             autofocus={!showCategorize && !isLoading}
             className="text-xl"
           />

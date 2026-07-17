@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useEditor, EditorContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -150,6 +150,31 @@ const SlashCommand = Extension.create({
   },
 });
 
+// Custom extension to handle Cmd+Enter for saving
+const SaveShortcut = Extension.create({
+  name: "saveShortcut",
+
+  addOptions() {
+    return {
+      onSave: null as (() => void) | null,
+    };
+  },
+
+  priority: 1000,
+
+  addKeyboardShortcuts() {
+    return {
+      "Mod-Enter": () => {
+        if (this.options.onSave) {
+          this.options.onSave();
+          return true;
+        }
+        return false;
+      },
+    };
+  },
+});
+
 export function RichTextEditor({
   content,
   onChange,
@@ -161,9 +186,24 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
+  // Use a ref to store the latest onSave callback
+  // This ensures the keyboard shortcut always calls the current version
+  const onSaveRef = useRef(onSave);
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
   const editor = useEditor(
     {
       extensions: [
+        SaveShortcut.configure({
+          onSave: () => {
+            if (onSaveRef.current) {
+              onSaveRef.current();
+            }
+          },
+        }),
         StarterKit.configure({
           // Configure heading levels (only h1, h2, h3)
           heading: {
@@ -272,16 +312,23 @@ export function RichTextEditor({
           ),
         },
         handleKeyDown: (view, event) => {
-          // Handle Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux) to trigger save
-          if (
-            onSave &&
-            (event.metaKey || event.ctrlKey) &&
-            event.key === "Enter"
-          ) {
+          // Check for Cmd+Enter or Ctrl+Enter
+          const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+          const isEnter = event.key === "Enter";
+
+          if (isCmdOrCtrl && isEnter && onSaveRef.current) {
+            // Stop the event immediately - this runs BEFORE Tiptap processes it
             event.preventDefault();
-            onSave();
+            event.stopPropagation();
+
+            // Call save
+            onSaveRef.current();
+
+            // Return true to tell ProseMirror we handled it
             return true;
           }
+
+          // Let other keys be handled normally
           return false;
         },
       },
