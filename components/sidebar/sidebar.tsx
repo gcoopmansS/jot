@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   Inbox,
-  Grid3x3,
+  Clock,
   Plus,
   Repeat,
   MoreVertical,
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
  *
  * Shows navigation links for:
  * - Unsorted notes (inbox)
- * - All notes (Everything view)
+ * - All notes (Recent view)
  * - Projects list (collapsible)
  * - Sign out
  *
@@ -54,6 +54,20 @@ export function Sidebar() {
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(
     null,
   );
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // Get current user's email
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    };
+    fetchUser();
+  }, [supabase]);
 
   // Fetch projects from API
   const { data: projects = [], isLoading: projectsLoading } = useQuery<
@@ -302,12 +316,12 @@ export function Sidebar() {
             <Inbox className="h-4 w-4" />
             Unsorted
           </span>
-          {noteCounts?.unsorted && noteCounts.unsorted > 0 && (
+          {noteCounts?.unsorted !== undefined && (
             <Badge variant="count">{noteCounts.unsorted}</Badge>
           )}
         </Link>
 
-        {/* Everything view */}
+        {/* Recent view */}
         <Link
           href="/everything"
           className={cn(
@@ -319,10 +333,10 @@ export function Sidebar() {
           style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
         >
           <span className="flex items-center gap-2">
-            <Grid3x3 className="h-4 w-4" />
-            Everything
+            <Clock className="h-4 w-4" />
+            Recent
           </span>
-          {noteCounts?.total && noteCounts.total > 0 && (
+          {noteCounts?.total !== undefined && (
             <Badge variant="count">{noteCounts.total}</Badge>
           )}
         </Link>
@@ -696,13 +710,35 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Footer with settings and sign out */}
-      <div className="border-t border-[var(--line)] px-3 py-4 space-y-1">
-        <Link href="/settings">
-          <Button variant="ghost" size="sm" className="w-full justify-start">
-            Account
-          </Button>
-        </Link>
+      {/* Footer with user identity and sign out */}
+      <div className="border-t border-[var(--line)] px-3 py-4 space-y-2.5">
+        {/* User identity indicator - clickable, links to settings */}
+        {userEmail && (
+          <Link href="/settings">
+            <button className="flex w-full items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-left transition-colors hover:bg-[var(--accent-soft)]">
+              {/* Circular avatar with first letter */}
+              <div
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
+                style={{
+                  fontFamily: "var(--font-ibm-plex-sans)",
+                  backgroundColor: "var(--accent)",
+                }}
+              >
+                {userEmail.charAt(0).toUpperCase()}
+              </div>
+              {/* Email address, truncated if too long */}
+              <span
+                className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                title={userEmail}
+              >
+                {userEmail}
+              </span>
+            </button>
+          </Link>
+        )}
+
+        {/* Sign out button */}
         <Button
           variant="ghost"
           size="sm"

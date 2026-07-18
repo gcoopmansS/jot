@@ -17,9 +17,9 @@ import { AnimatePresence } from "framer-motion";
 import { useMemo } from "react";
 
 /**
- * Everything page - shows all notes across all projects.
+ * Recent page - shows all notes across all projects, sorted by most recent first.
  *
- * A chronological or searchable view of every note the user has written,
+ * A chronological view of recent activity, showing every note the user has written,
  * regardless of project or filing status.
  * Shows type badges and location tags since items are mixed.
  */
@@ -98,7 +98,7 @@ export default function EverythingPage() {
 
   return (
     <>
-      <AppHeader title="Everything" />
+      <AppHeader title="Recent" />
       <div className="flex-1 px-10 py-6">
         {isLoading ? (
           <LoadingPage />

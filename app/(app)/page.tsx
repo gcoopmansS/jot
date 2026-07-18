@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 /**
  * Main authenticated app page.
  *
- * Redirects to /everything by default.
+ * Redirects to /everything (Recent view) by default.
  */
 export default function HomePage() {
   const router = useRouter();

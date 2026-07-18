@@ -48,7 +48,7 @@ function stripMarkdown(text: string): string {
  *
  * Context-aware display:
  * - In specific meeting/topic views: hides type badge and location (redundant with breadcrumb)
- * - In mixed views (Everything): shows type badge and location tag
+ * - In mixed views (Recent): shows type badge and location tag
  * - In unsorted view: shows type badge if type was selected, shows "File this →" button
  *
  * Always shows: title (if present), snippet, timestamp, delete button on hover

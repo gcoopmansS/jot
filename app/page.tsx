@@ -15,7 +15,7 @@ import { AccountDeletedNotification } from "@/components/landing/account-deleted
 /**
  * Public landing page shown to logged-out visitors.
  *
- * If a user is already authenticated, they're redirected to /everything.
+ * If a user is already authenticated, they're redirected to /everything (Recent view).
  * Otherwise, this page introduces Jot's core concept and value proposition.
  */
 export default async function LandingPage() {
