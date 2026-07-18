@@ -117,12 +117,15 @@ export default function SettingsPage() {
           ? window.location.origin
           : process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
+      // Encode the next parameter properly to avoid URL parsing issues
+      const nextPath = encodeURIComponent("/settings?emailConfirmed=true");
+
       const { error } = await supabase.auth.updateUser(
         {
           email: newEmail,
         },
         {
-          emailRedirectTo: `${siteUrl}/auth/callback?next=/settings?emailConfirmed=true`,
+          emailRedirectTo: `${siteUrl}/auth/callback?next=${nextPath}`,
         },
       );
 
@@ -144,7 +147,11 @@ export default function SettingsPage() {
         setEmailStatus({
           type: "success",
           message:
-            "Check your new email address for a confirmation link to complete the change.",
+            "Email change requested. Check both your CURRENT email (" +
+            currentEmail +
+            ") and your NEW email (" +
+            newEmail +
+            ") for confirmation links. Click both links to complete the change.",
         });
         setNewEmail("");
         setConfirmEmail("");
@@ -174,10 +181,10 @@ export default function SettingsPage() {
     }
 
     // Validate password length
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       setPasswordStatus({
         type: "error",
-        message: "Password must be at least 6 characters.",
+        message: "Password must be at least 8 characters.",
       });
       return;
     }
@@ -291,6 +298,17 @@ export default function SettingsPage() {
       >
         Manage your account preferences and data
       </p>
+      <p className="mt-2">
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors underline"
+          style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+        >
+          Privacy Policy
+        </a>
+      </p>
 
       {/* Email Update Section */}
       <section className="mt-8">
@@ -305,8 +323,10 @@ export default function SettingsPage() {
             className="mt-1 text-sm text-[var(--ink-soft)]"
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
           >
-            Update the email address associated with your account. You'll need
-            to confirm the new address via email.
+            Change the email address for your account. For security,
+            confirmation links will be sent to both your current and new email
+            addresses. Your email will only be changed after both links are
+            clicked.
           </p>
 
           {currentEmail && (
@@ -377,6 +397,20 @@ export default function SettingsPage() {
                 {emailStatus.message}
               </div>
             )}
+
+            {/* Security notice */}
+            <div className="rounded-[var(--radius)] border border-[#f5d896] bg-[var(--amber-soft)] px-4 py-3">
+              <p
+                className="text-xs text-[var(--ink)]"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              >
+                <span className="font-semibold">Security notice:</span> If you
+                receive a confirmation email at your current address that you
+                didn't request, do not click the link. The request will expire
+                automatically within 1 hour, but you should change your password
+                immediately.
+              </p>
+            </div>
 
             <Button
               type="submit"

@@ -390,6 +390,13 @@ export default async function LandingPage() {
               >
                 Capture first, file later
               </p>
+              <Link
+                href="/privacy"
+                className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors underline mt-2 inline-block"
+                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+              >
+                Privacy Policy
+              </Link>
             </div>
             <Link
               href="/auth/sign-in?mode=sign-up"

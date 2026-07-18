@@ -15,7 +15,10 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") ?? "/everything";
+  const nextParam = requestUrl.searchParams.get("next");
+
+  // Decode the next parameter (it comes URL-encoded from the email link)
+  const next = nextParam ? decodeURIComponent(nextParam) : "/everything";
 
   if (code) {
     const supabase = await createServerSupabaseClient();

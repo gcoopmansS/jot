@@ -37,16 +37,27 @@ function AuthForm() {
   // Form fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [privacyError, setPrivacyError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    setPrivacyError(false);
+
+    // Validate privacy policy agreement for sign-up
+    if (mode === "sign-up" && !agreedToPrivacy) {
+      setPrivacyError(true);
+      setError("Please agree to the Privacy Policy to continue");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -114,6 +125,7 @@ function AuthForm() {
               setMode("sign-in");
               setError(null);
               setMessage(null);
+              setPrivacyError(false);
             }}
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
             className={`flex-1 py-2 px-4 rounded-[var(--radius)] font-medium transition-colors ${
@@ -130,6 +142,7 @@ function AuthForm() {
               setMode("sign-up");
               setError(null);
               setMessage(null);
+              setPrivacyError(false);
             }}
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
             className={`flex-1 py-2 px-4 rounded-[var(--radius)] font-medium transition-colors ${
@@ -213,10 +226,80 @@ function AuthForm() {
                 className="mt-2 text-xs text-[var(--ink-soft)]"
                 style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
               >
-                Must be at least 6 characters
+                Must be at least 8 characters
               </p>
             )}
           </div>
+
+          {/* Privacy policy checkbox - only show during sign-up */}
+          {mode === "sign-up" && (
+            <div className="mb-4">
+              <label
+                className="flex items-start gap-3 cursor-pointer group"
+                htmlFor="privacy-checkbox"
+              >
+                <div className="relative flex items-center justify-center mt-0.5">
+                  <input
+                    id="privacy-checkbox"
+                    type="checkbox"
+                    checked={agreedToPrivacy}
+                    onChange={(e) => {
+                      setAgreedToPrivacy(e.target.checked);
+                      setPrivacyError(false);
+                      setError(null);
+                    }}
+                    className="peer w-5 h-5 border-2 rounded cursor-pointer appearance-none transition-colors"
+                    style={{
+                      borderColor: privacyError ? "#dc2626" : "var(--line)",
+                    }}
+                  />
+                  {/* Custom checkmark */}
+                  <svg
+                    className="absolute w-3 h-3 pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity"
+                    viewBox="0 0 12 10"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M1 5L4.5 8.5L11 1"
+                      stroke="white"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {/* Background color when checked */}
+                  <div
+                    className="absolute inset-0 rounded opacity-0 peer-checked:opacity-100 transition-opacity -z-10"
+                    style={{ backgroundColor: "var(--accent)" }}
+                  />
+                </div>
+                <span
+                  className="text-sm text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  I agree to the{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--accent)] underline hover:text-[var(--ink)] transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Privacy Policy
+                  </a>
+                </span>
+              </label>
+              {privacyError && (
+                <p
+                  className="mt-2 text-xs text-red-600"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  You must agree to the Privacy Policy to create an account
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Submit button */}
           <button
