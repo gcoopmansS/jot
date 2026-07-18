@@ -331,11 +331,11 @@ export default function NotePage() {
     >
       {/* Header with hint text and close button */}
       <div
-        className="flex items-center justify-between px-10 py-5"
+        className="flex items-center justify-between px-4 sm:px-6 md:px-10 py-4 sm:py-5"
         style={{ borderBottom: "1px solid var(--line)" }}
       >
         <div
-          className="text-sm"
+          className="text-xs sm:text-sm"
           style={{
             fontFamily: "var(--font-ibm-plex-mono)",
             color: "var(--ink-soft)",
@@ -347,14 +347,16 @@ export default function NotePage() {
             </span>
           ) : hasChanges ? (
             <span>
-              Unsaved changes · <Kbd className="mr-2">esc</Kbd> to save and
-              close
+              Unsaved changes ·{" "}
+              <Kbd className="mr-2 hidden sm:inline-flex">esc</Kbd>{" "}
+              <span className="hidden sm:inline">to save and close</span>
             </span>
           ) : saveStatus === "saved" ? (
             <span style={{ color: "var(--accent)" }}>✓ Saved</span>
           ) : (
             <span>
-              <Kbd className="mr-2">esc</Kbd> to close
+              <Kbd className="mr-2 hidden sm:inline-flex">esc</Kbd>{" "}
+              <span className="hidden sm:inline">to close</span>
             </span>
           )}
         </div>
@@ -368,7 +370,7 @@ export default function NotePage() {
       </div>
 
       {/* Full-screen rich text editor */}
-      <div className="flex-1 flex justify-center px-10 overflow-y-auto">
+      <div className="flex-1 flex justify-center px-4 sm:px-6 md:px-10 overflow-y-auto">
         <div
           className="w-full max-w-3xl"
           style={{
@@ -390,7 +392,7 @@ export default function NotePage() {
         saveStatus === "retrying" ||
         saveStatus === "failed") && (
         <div
-          className="px-10 py-4"
+          className="px-4 sm:px-6 md:px-10 py-4"
           style={{
             borderTop: "1px solid var(--line)",
             backgroundColor: "var(--paper)",

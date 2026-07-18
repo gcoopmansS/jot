@@ -35,7 +35,7 @@ export default function UnsortedPage() {
   return (
     <>
       <AppHeader title="Unsorted" />
-      <div className="flex-1 px-10 py-6">
+      <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
         {/* Loading state */}
         {isLoading && <LoadingPage />}
 

@@ -124,17 +124,20 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
 
   return (
     <header className="border-b border-[var(--line)] bg-[var(--paper-raised)]">
-      <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-6 px-10 py-4">
-        {/* Page title */}
+      <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-2 sm:gap-4 md:gap-6 px-4 sm:px-6 md:px-10 py-3 sm:py-4">
+        {/* Page title - hidden on very narrow screens to save space */}
         <h2
-          className="text-lg font-semibold text-[var(--ink)]"
+          className="hidden md:block text-lg font-semibold text-[var(--ink)] flex-shrink-0 max-w-[240px] truncate"
           style={{ fontFamily: "var(--font-space-grotesk)" }}
         >
           {title}
         </h2>
 
         {/* Search bar - wrapped in a container for the dropdown */}
-        <div ref={searchContainerRef} className="relative flex-1 max-w-md">
+        <div
+          ref={searchContainerRef}
+          className="relative flex-1 min-w-[160px] max-w-md"
+        >
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-soft)] pointer-events-none z-10" />
           <input
             ref={searchInputRef}
@@ -181,11 +184,11 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
         <Button
           onClick={() => openCapture()}
           variant="primary"
-          className="gap-2"
+          className="gap-2 flex-shrink-0 px-3 lg:px-4 min-w-[44px]"
         >
           <Plus className="h-4 w-4" />
-          New note
-          <Kbd>⌘⏎</Kbd>
+          <span className="hidden lg:inline">New note</span>
+          <Kbd className="hidden xl:inline">⌘⏎</Kbd>
         </Button>
       </div>
     </header>

@@ -285,7 +285,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-10 py-12">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 md:px-10 py-8 sm:py-12">
       <h1
         className="text-3xl font-semibold tracking-tight text-[var(--ink)]"
         style={{ fontFamily: "var(--font-space-grotesk)" }}

@@ -456,17 +456,18 @@ export function CaptureOverlay() {
             className="fixed inset-0 z-50 flex flex-col bg-[var(--paper)]"
           >
             {/* Header with hint text and discard link */}
-            <div className="flex items-center justify-between border-b border-[var(--line)] px-10 py-5">
+            <div className="flex items-center justify-between border-b border-[var(--line)] px-4 sm:px-6 md:px-10 py-4 sm:py-5">
               <div
-                className="text-sm text-[var(--ink-soft)]"
+                className="text-xs sm:text-sm text-[var(--ink-soft)]"
                 style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
               >
                 {!showCategorize && (
                   <>
-                    <Kbd className="mr-2">⌘⏎</Kbd>
-                    to finish
+                    <Kbd className="mr-2 hidden sm:inline-flex">⌘⏎</Kbd>
+                    <span className="hidden sm:inline">to finish</span>
+                    <span className="sm:hidden">Tap to finish</span>
                     {prefilledContext && (
-                      <span className="ml-2 text-[var(--accent)]">
+                      <span className="ml-2 text-[var(--accent)] hidden sm:inline">
                         → saves directly to this meeting
                       </span>
                     )}
@@ -489,7 +490,7 @@ export function CaptureOverlay() {
 
             {/* Full-screen rich text editor */}
             <div
-              className="flex flex-1 justify-center overflow-y-auto px-10"
+              className="flex flex-1 justify-center overflow-y-auto px-4 sm:px-6 md:px-10"
               onClick={showCategorize ? handleBack : undefined}
             >
               <div
@@ -514,7 +515,7 @@ export function CaptureOverlay() {
             {(saveStatus === "saving" ||
               saveStatus === "retrying" ||
               saveStatus === "failed") && (
-              <div className="border-t border-[var(--line)] bg-[var(--paper)] px-10 py-4">
+              <div className="border-t border-[var(--line)] bg-[var(--paper)] px-4 sm:px-6 md:px-10 py-4">
                 <div
                   className="flex items-center justify-between text-sm"
                   style={{ fontFamily: "var(--font-ibm-plex-sans)" }}

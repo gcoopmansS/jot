@@ -208,7 +208,7 @@ export function CategorizeBar({
           className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--line)] bg-[var(--paper-raised)]"
           style={{ boxShadow: "var(--shadow-pop)" }}
         >
-          <div className="mx-auto max-w-3xl px-10 py-6">
+          <div className="mx-auto max-w-3xl px-4 sm:px-6 md:px-10 py-4 sm:py-6">
             {/* Heading */}
             <div className="mb-4">
               <h3
@@ -217,7 +217,7 @@ export function CategorizeBar({
               >
                 What are these notes about?{" "}
                 <span
-                  className="font-normal text-[var(--ink-soft)]"
+                  className="font-normal text-[var(--ink-soft)] hidden sm:inline"
                   style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                 >
                   — optional, you can always file later
@@ -244,7 +244,7 @@ export function CategorizeBar({
             </div>
 
             {/* Type toggle row */}
-            <div className="mb-4 flex items-center gap-3">
+            <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
               <div className="flex gap-2">
                 <button
                   onClick={() => setType(type === "meeting" ? null : "meeting")}
@@ -272,7 +272,7 @@ export function CategorizeBar({
             </div>
 
             {/* Input fields */}
-            <div className="mb-4 grid grid-cols-2 gap-4">
+            <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Project */}
               <AutocompleteInput
                 value={projectInput}
@@ -299,19 +299,27 @@ export function CategorizeBar({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <button
                 onClick={onBack}
-                className="text-sm text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)] cursor-pointer"
+                className="text-sm text-[var(--ink-soft)] transition-colors hover:text-[var(--ink)] cursor-pointer text-center sm:text-left"
                 style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
               >
                 ← Back to note
               </button>
               <div className="flex items-center gap-3">
-                <Button onClick={handleSave} variant="primary">
+                <Button
+                  onClick={handleSave}
+                  variant="primary"
+                  className="flex-1 sm:flex-initial"
+                >
                   File note
                 </Button>
-                <Button onClick={onSkip} variant="secondary">
+                <Button
+                  onClick={onSkip}
+                  variant="secondary"
+                  className="flex-1 sm:flex-initial"
+                >
                   Skip for now
                 </Button>
               </div>

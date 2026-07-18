@@ -83,6 +83,7 @@ export function SearchResults({
         className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[500px] overflow-y-auto rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)]"
         style={{
           boxShadow: "var(--shadow-pop)",
+          maxWidth: "calc(100vw - 32px)", // Ensure it doesn't overflow viewport at narrow widths
         }}
       >
         {/* Loading state */}

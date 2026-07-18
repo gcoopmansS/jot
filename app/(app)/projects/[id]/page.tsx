@@ -99,7 +99,7 @@ export default function ProjectOverviewPage() {
     return (
       <>
         <AppHeader title="Loading..." />
-        <div className="flex-1 px-10 py-6">
+        <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
           <LoadingPage />
         </div>
       </>
@@ -110,7 +110,7 @@ export default function ProjectOverviewPage() {
     return (
       <>
         <AppHeader title="Project Not Found" />
-        <div className="flex-1 px-10 py-6">
+        <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
           <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
             Project not found.
           </p>
@@ -126,7 +126,7 @@ export default function ProjectOverviewPage() {
   return (
     <>
       <AppHeader title={project.name} />
-      <div className="flex-1 px-10 py-6">
+      <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
         {meetingsLoading || topicsLoading ? (
           <LoadingPage />
         ) : !hasContent ? (

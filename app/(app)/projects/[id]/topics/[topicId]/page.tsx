@@ -66,7 +66,7 @@ export default function TopicPage() {
     return (
       <>
         <AppHeader title="Loading..." />
-        <div className="flex-1 px-10 py-6">
+        <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
           <LoadingPage />
         </div>
       </>
@@ -77,7 +77,7 @@ export default function TopicPage() {
     return (
       <>
         <AppHeader title="Topic Not Found" />
-        <div className="flex-1 px-10 py-6">
+        <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
           <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
             This topic doesn't exist or you don't have access to it.
           </p>
@@ -103,7 +103,7 @@ export default function TopicPage() {
           </>
         }
       />
-      <div className="flex-1 px-10 py-6">
+      <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
         {notesLoading ? (
           <LoadingPage />
         ) : notes.length === 0 ? (

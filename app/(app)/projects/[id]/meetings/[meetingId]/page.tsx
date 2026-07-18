@@ -67,7 +67,7 @@ export default function MeetingPage() {
     return (
       <>
         <AppHeader title="Loading..." />
-        <div className="flex-1 px-10 py-6">
+        <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
           <LoadingPage />
         </div>
       </>
@@ -78,7 +78,7 @@ export default function MeetingPage() {
     return (
       <>
         <AppHeader title="Meeting Not Found" />
-        <div className="flex-1 px-10 py-6">
+        <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
           <p className="text-sm" style={{ color: "var(--ink-soft)" }}>
             This meeting doesn't exist or you don't have access to it.
           </p>
@@ -112,7 +112,7 @@ export default function MeetingPage() {
           </>
         }
       />
-      <div className="flex-1 px-10 py-6">
+      <div className="flex-1 px-4 sm:px-6 md:px-10 py-6">
         <div className="max-w-3xl mx-auto">
           {/* Series banner - shown for all meetings to handle recurring state */}
           <SeriesBanner
