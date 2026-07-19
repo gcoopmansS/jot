@@ -205,8 +205,13 @@ export function CategorizeBar({
           exit={{ y: "110%" }}
           transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--line)] bg-[var(--paper-raised)]"
-          style={{ boxShadow: "var(--shadow-pop)" }}
+          className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--paper-raised)]"
+          style={{
+            boxShadow: "var(--shadow-pop)",
+            borderTop: "1px solid var(--line)",
+            background:
+              "linear-gradient(to bottom, rgba(27, 37, 33, 0.04) 0px, transparent 12px, var(--paper-raised) 12px)",
+          }}
         >
           <div className="mx-auto max-w-3xl px-4 sm:px-6 md:px-10 py-4 sm:py-6">
             {/* Heading */}
@@ -284,18 +289,27 @@ export function CategorizeBar({
               />
 
               {/* Topic */}
-              <AutocompleteInput
-                value={topicInput}
-                onChange={setTopicInput}
-                options={topics}
-                placeholder={
-                  type === "meeting"
-                    ? "e.g. Stakeholder sync — optional, defaults to 'General meeting'"
-                    : "e.g. Requirements analysis — optional, defaults to 'General'"
-                }
-                label="Topic"
-                disabled={!projectInput}
-              />
+              <div className="flex flex-col gap-1.5">
+                <AutocompleteInput
+                  value={topicInput}
+                  onChange={setTopicInput}
+                  options={topics}
+                  placeholder={
+                    type === "meeting"
+                      ? "e.g. Stakeholder sync"
+                      : "e.g. Requirements analysis"
+                  }
+                  label="Topic"
+                  disabled={!projectInput}
+                />
+                <p
+                  className="text-[11px] text-[var(--ink-soft)] -mt-0.5"
+                  style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+                >
+                  Optional — defaults to &lsquo;
+                  {type === "meeting" ? "General meeting" : "General"}&rsquo;
+                </p>
+              </div>
             </div>
 
             {/* Actions */}

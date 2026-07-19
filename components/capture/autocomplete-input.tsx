@@ -159,11 +159,12 @@ export function AutocompleteInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
-        className="px-3 py-2 text-sm border rounded-lg outline-none transition-colors disabled:opacity-50"
+        className="px-3 py-2 text-sm border rounded-lg outline-none transition-colors disabled:opacity-50 placeholder:text-[var(--ink-soft)]"
         style={{
           borderColor: isOpen ? "var(--accent)" : "var(--line)",
           backgroundColor: disabled ? "var(--paper)" : "var(--paper)",
           color: "var(--ink)",
+          fontFamily: "var(--font-ibm-plex-sans)",
         }}
       />
 
