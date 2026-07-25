@@ -808,7 +808,7 @@ export function Sidebar() {
           {/* User identity indicator - clickable, links to settings */}
           {userEmail && (
             <Link href="/settings" onClick={() => setIsSidebarOpen(false)}>
-              <button className="flex w-full items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-left transition-colors hover:bg-[var(--accent-soft)]">
+              <button className="flex w-full items-center gap-3 rounded-[var(--radius)] px-2 py-2 text-left transition-colors hover:bg-[var(--accent-soft)] cursor-pointer">
                 {/* Circular avatar with first letter */}
                 <div
                   className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
