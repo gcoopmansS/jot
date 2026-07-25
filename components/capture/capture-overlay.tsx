@@ -8,7 +8,6 @@ import { saveDraft, clearDraft } from "@/lib/draft-storage";
 import { generateNoteId, retryWithBackoff } from "@/lib/retry";
 import { pendingSavesManager } from "@/lib/pending-saves";
 import { CategorizeBar } from "./categorize-bar";
-import { Kbd } from "@/components/ui/kbd";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
@@ -176,6 +175,16 @@ export function CaptureOverlay() {
     return unsubscribe;
   }, [noteId, queryClient, closeCapture]);
 
+  // Extract the finish logic so it can be called from both keyboard shortcut and button
+  const handleFinish = useCallback(() => {
+    // If we have prefilled context, save directly without showing categorize bar
+    if (prefilledContext) {
+      handleSaveWithContext();
+    } else {
+      setShowCategorize(true);
+    }
+  }, [prefilledContext, handleSaveWithContext]);
+
   // Focus textarea when overlay opens or when returning from categorize bar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -184,19 +193,13 @@ export function CaptureOverlay() {
       // Cmd/Ctrl + Enter to finish
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-
-        // If we have prefilled context, save directly without showing categorize bar
-        if (prefilledContext) {
-          handleSaveWithContext();
-        } else {
-          setShowCategorize(true);
-        }
+        handleFinish();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, showCategorize, prefilledContext, handleSaveWithContext]);
+  }, [isOpen, showCategorize, handleFinish]);
 
   // Reset state when overlay closes OR initialize text when it opens with initialText
   useEffect(() => {
@@ -387,13 +390,6 @@ export function CaptureOverlay() {
               is_unsorted: true,
             }),
           });
-          {
-            prefilledContext && (
-              <span className="ml-2 text-[var(--accent)]">
-                → saves directly to this meeting
-              </span>
-            );
-          }
 
           if (!response.ok) {
             const errorData = await response.json();
@@ -455,36 +451,47 @@ export function CaptureOverlay() {
             onClick={showCategorize ? handleBack : undefined}
             className="fixed inset-0 z-50 flex flex-col bg-[var(--paper)]"
           >
-            {/* Header with hint text and discard link */}
+            {/* Header with Done button and discard link */}
             <div className="flex items-center justify-between border-b border-[var(--line)] px-4 sm:px-6 md:px-10 py-4 sm:py-5">
-              <div
-                className="text-xs sm:text-sm text-[var(--ink-soft)]"
-                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
-              >
-                {!showCategorize && (
-                  <>
-                    <Kbd className="mr-2 hidden sm:inline-flex">⌘⏎</Kbd>
-                    <span className="hidden sm:inline">to finish</span>
-                    <span className="sm:hidden">Tap to finish</span>
-                    {prefilledContext && (
-                      <span className="ml-2 text-[var(--accent)] hidden sm:inline">
-                        → saves directly to this meeting
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
               {!showCategorize && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDiscardClick();
-                  }}
-                  className="text-sm text-[var(--ink-soft)] underline transition-colors hover:text-[var(--ink)] cursor-pointer"
-                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
-                >
-                  Discard
-                </button>
+                <>
+                  {/* Left side: Done button with optional keyboard hint */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFinish();
+                      }}
+                      className="px-4 py-2.5 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium text-sm transition-colors hover:bg-[var(--accent)] min-h-[44px] flex items-center"
+                      style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                    >
+                      Done
+                    </button>
+                    <div
+                      className="text-xs text-[var(--ink-soft)] hidden sm:flex items-center gap-2"
+                      style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+                    >
+                      <span>⌘⏎</span>
+                      {prefilledContext && (
+                        <span className="text-[var(--accent)]">
+                          → saves directly to this meeting
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right side: Discard link */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDiscardClick();
+                    }}
+                    className="text-sm text-[var(--ink-soft)] underline transition-colors hover:text-[var(--ink)] cursor-pointer"
+                    style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                  >
+                    Discard
+                  </button>
+                </>
               )}
             </div>
 

@@ -616,7 +616,7 @@ export function Sidebar() {
 
                             <DropdownMenu.Portal>
                               <DropdownMenu.Content
-                                className="min-w-[160px] rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-1 shadow-[var(--shadow-pop)]"
+                                className="z-50 min-w-[160px] rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-1 shadow-[var(--shadow-pop)]"
                                 sideOffset={5}
                                 align="end"
                                 onPointerLeave={() =>

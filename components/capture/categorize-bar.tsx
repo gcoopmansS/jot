@@ -208,7 +208,6 @@ export function CategorizeBar({
           className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--paper-raised)]"
           style={{
             boxShadow: "var(--shadow-pop)",
-            borderTop: "1px solid var(--line)",
             background:
               "linear-gradient(to bottom, rgba(27, 37, 33, 0.04) 0px, transparent 12px, var(--paper-raised) 12px)",
           }}
