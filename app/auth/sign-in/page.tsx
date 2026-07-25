@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
+import Link from "next/link";
 
 /**
  * Sign-in/sign-up page for the Jot app.
@@ -101,12 +102,14 @@ function AuthForm() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1
-            className="text-4xl font-semibold text-[var(--ink)] mb-2"
-            style={{ fontFamily: "var(--font-space-grotesk)" }}
-          >
-            Jot
-          </h1>
+          <Link href="/">
+            <h1
+              className="text-4xl font-semibold text-[var(--ink)] mb-2 hover:text-[var(--accent)] transition-colors cursor-pointer"
+              style={{ fontFamily: "var(--font-space-grotesk)" }}
+            >
+              Jot
+            </h1>
+          </Link>
           <p
             className="text-[var(--ink-soft)]"
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
