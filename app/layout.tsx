@@ -39,6 +39,7 @@ const sourceSerif4 = Source_Serif_4({
 export const metadata: Metadata = {
   title: "Jot - Capture first, organize later",
   description: "Low-friction note-taking for busy professionals",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
