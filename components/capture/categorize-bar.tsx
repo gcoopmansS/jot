@@ -93,16 +93,27 @@ export function CategorizeBar({
   }, [projectInput, projects, type]);
 
   const handleSave = async () => {
-    const project = projects.find((p) => p.name === projectInput);
+    // Apply defaults for "File note" action - never leave unsorted
+    const finalType: "meeting" | "general" = type || "general";
+
+    // Default project name if user left it blank
+    const finalProjectName = projectInput.trim() || "Unfiled Project";
+
+    // Default topic/meeting name based on type
+    const finalTopicName =
+      topicInput.trim() ||
+      (finalType === "meeting" ? "General meeting" : "General");
+
+    // Find or create the project
+    let project = projects.find((p) => p.name === finalProjectName);
     let projectId = project?.id;
 
-    // If project doesn't exist and user entered a name, create it
-    if (!projectId && projectInput.trim()) {
+    if (!projectId) {
       try {
         const response = await fetch("/api/projects", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: projectInput.trim() }),
+          body: JSON.stringify({ name: finalProjectName }),
         });
         if (response.ok) {
           const newProject = await response.json();
@@ -118,11 +129,11 @@ export function CategorizeBar({
     let topicId: string | undefined;
     let meetingId: string | undefined;
 
-    // If user entered a topic/meeting name
-    if (topicInput.trim() && projectId) {
-      if (type === "meeting") {
+    // Always create/find a topic or meeting (since we have defaults now)
+    if (projectId) {
+      if (finalType === "meeting") {
         // Create or find meeting
-        const existingMeeting = topics.find((t) => t.name === topicInput);
+        const existingMeeting = topics.find((t) => t.name === finalTopicName);
         if (existingMeeting) {
           meetingId = existingMeeting.id;
         } else {
@@ -132,7 +143,7 @@ export function CategorizeBar({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 project_id: projectId,
-                name: topicInput.trim(),
+                name: finalTopicName,
                 recurring: false,
               }),
             });
@@ -148,7 +159,7 @@ export function CategorizeBar({
         }
       } else {
         // Create or find topic
-        const existingTopic = topics.find((t) => t.name === topicInput);
+        const existingTopic = topics.find((t) => t.name === finalTopicName);
         if (existingTopic) {
           topicId = existingTopic.id;
         } else {
@@ -158,7 +169,7 @@ export function CategorizeBar({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 project_id: projectId,
-                name: topicInput.trim(),
+                name: finalTopicName,
               }),
             });
             if (response.ok) {
@@ -174,19 +185,19 @@ export function CategorizeBar({
       }
     }
 
-    // Validate: type must match ID (prevent constraint violation)
-    // If type is "meeting" but no meetingId, or "general" but no topicId,
-    // treat as unsorted rather than sending invalid data
+    // When "File note" is clicked, ALWAYS file the note (is_unsorted: false)
+    // Only mark as unsorted if there was a failure creating the required entities
     const isValidCategorization =
-      (type === "meeting" && meetingId) || (type === "general" && topicId);
+      (finalType === "meeting" && meetingId) ||
+      (finalType === "general" && topicId);
 
     onSave({
       title: title.trim() || undefined, // Include title if provided
-      type: type || "general",
+      type: finalType,
       projectId,
       topicId,
       meetingId,
-      isUnsorted: !isValidCategorization, // Mark as unsorted if categorization is incomplete
+      isUnsorted: !isValidCategorization, // Only unsorted if creation failed
     });
   };
 
