@@ -151,33 +151,84 @@ export function NoteCard({
 
   // Generate preview text based on whether title exists
   const generatePreview = () => {
-    // Skip leading blank lines
-    const lines = note.text.split("\n");
-    const firstNonEmptyLine = lines.find((line) => line.trim()) || "";
+    const lines = note.text.split("\n").map((line) => line.trim());
+    const nonEmptyLines = lines.filter((line) => line.length > 0);
 
-    // Strip markdown formatting for clean preview
-    const cleanText = stripMarkdown(firstNonEmptyLine);
+    if (nonEmptyLines.length === 0) {
+      return { hasTitle: false, snippet: "", needsEllipsis: false };
+    }
+
+    // Check if first non-empty line is a markdown heading
+    const firstLine = nonEmptyLines[0];
+    const headingMatch = firstLine.match(/^(#{1,6})\s+(.+)$/);
 
     if (note.title) {
-      // If there's a title, show a short one-line snippet of the body
+      // Explicit title exists: generate snippet from body content
+      // Skip any leading heading in the body content
+      let bodyLines = nonEmptyLines;
+      if (headingMatch) {
+        // First line is a heading, skip it and use the rest
+        bodyLines = nonEmptyLines.slice(1);
+      }
+
+      // Combine remaining lines and strip markdown for snippet
+      const bodyText = bodyLines.join(" ");
+      const cleanText = stripMarkdown(bodyText);
+
+      if (!cleanText) {
+        // No body content after heading
+        return { hasTitle: true, title: note.title, snippet: "", needsEllipsis: false };
+      }
+
       const snippet = cleanText.slice(0, 80);
       const cutAtWordBoundary =
         snippet.length < cleanText.length
           ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
           : snippet;
+
       return {
         hasTitle: true,
         title: note.title,
         snippet: cutAtWordBoundary,
         needsEllipsis: cleanText.length > 80,
       };
+    } else if (headingMatch) {
+      // No explicit title, but content starts with heading: treat heading as title
+      const extractedTitle = headingMatch[2]; // Heading text without # markers
+      const bodyLines = nonEmptyLines.slice(1); // Content after the heading
+
+      // Generate snippet from content that follows the heading
+      const bodyText = bodyLines.join(" ");
+      const cleanText = stripMarkdown(bodyText);
+
+      if (!cleanText) {
+        // Heading only, no content after it
+        return { hasTitle: true, title: extractedTitle, snippet: "", needsEllipsis: false };
+      }
+
+      const snippet = cleanText.slice(0, 80);
+      const cutAtWordBoundary =
+        snippet.length < cleanText.length
+          ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
+          : snippet;
+
+      return {
+        hasTitle: true,
+        title: extractedTitle,
+        snippet: cutAtWordBoundary,
+        needsEllipsis: cleanText.length > 80,
+      };
     } else {
-      // No title: show a longer snippet (up to 150 chars), cut at word boundary
+      // No title, no leading heading: show entire content as snippet
+      const fullText = nonEmptyLines.join(" ");
+      const cleanText = stripMarkdown(fullText);
+
       const snippet = cleanText.slice(0, 150);
       const cutAtWordBoundary =
         snippet.length < cleanText.length
           ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
           : snippet;
+
       return {
         hasTitle: false,
         snippet: cutAtWordBoundary,
