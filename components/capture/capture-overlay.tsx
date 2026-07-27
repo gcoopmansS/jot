@@ -516,7 +516,7 @@ export function CaptureOverlay() {
               )}
             </div>
 
-            {/* Full-screen rich text editor */}
+            {/* Full-screen writing surface with title */}
             <div
               className="flex flex-1 justify-center overflow-y-auto px-4 sm:px-6 md:px-10"
               onClick={showCategorize ? handleBack : undefined}
@@ -529,6 +529,18 @@ export function CaptureOverlay() {
                   paddingTop: "6vh",
                 }}
               >
+                {/* Title input - distinct from body */}
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Untitled (optional)"
+                  className="w-full mb-6 bg-transparent border-none text-3xl font-semibold text-[var(--ink)] placeholder:text-[var(--ink-soft)] focus:outline-none"
+                  style={{ fontFamily: "var(--font-space-grotesk)" }}
+                  disabled={showCategorize}
+                />
+
+                {/* Body text editor */}
                 <RichTextEditor
                   content={text}
                   onChange={setText}

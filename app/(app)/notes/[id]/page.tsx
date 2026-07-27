@@ -110,7 +110,7 @@ export default function NotePage() {
   // Track changes
   const handleTextChange = (newText: string) => {
     setText(newText);
-    setHasChanges(newText !== note?.text);
+    setHasChanges(newText !== note?.text || title !== (note?.title || ""));
   };
 
   // Save the note with automatic retry
@@ -121,9 +121,10 @@ export default function NotePage() {
         return;
       }
 
-      // Capture the sequence number and text at save-start time
+      // Capture the sequence number, text, and title at save-start time
       const thisSequence = ++saveSequenceRef.current;
       const textToSave = text.trim();
+      const titleToSave = title.trim() || null;
 
       setSaveStatus("saving");
       setSaveError("");
@@ -135,7 +136,7 @@ export default function NotePage() {
             const response = await fetch(`/api/notes/${noteId}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text: textToSave }),
+              body: JSON.stringify({ text: textToSave, title: titleToSave }),
             });
 
             if (!response.ok) {
@@ -198,7 +199,7 @@ export default function NotePage() {
         // Don't block the user - status indicator shows the issue
       }
     },
-    [hasChanges, text, noteId, note, queryClient],
+    [hasChanges, text, title, noteId, note, queryClient],
   );
 
   // Handle close button
@@ -440,7 +441,7 @@ export default function NotePage() {
         </button>
       </div>
 
-      {/* Full-screen rich text editor */}
+      {/* Full-screen writing surface with title */}
       <div className="flex-1 flex justify-center px-4 sm:px-6 md:px-10 overflow-y-auto">
         <div
           className="w-full max-w-3xl"
@@ -448,6 +449,21 @@ export default function NotePage() {
             paddingTop: "6vh",
           }}
         >
+          {/* Title input - distinct from body */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="Untitled (optional)"
+            className="w-full mb-6 bg-transparent border-none text-3xl font-semibold text-[var(--ink)] placeholder:text-[var(--ink-soft)] focus:outline-none"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+            disabled={showCategorize}
+          />
+
+          {/* Body text editor */}
           <RichTextEditor
             content={text}
             onChange={handleTextChange}

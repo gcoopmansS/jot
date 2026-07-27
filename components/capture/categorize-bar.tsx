@@ -42,7 +42,8 @@ export function CategorizeBar({
   onBack,
 }: CategorizeBarProps) {
   const queryClient = useQueryClient();
-  const [title, setTitle] = useState(initialTitle);
+  // Title is no longer edited here - it's set in the capture overlay/note view
+  // We still receive it via props to pass it through on save
   const [type, setType] = useState<"meeting" | "general" | null>(null);
   const [projectInput, setProjectInput] = useState("");
   const [topicInput, setTopicInput] = useState("");
@@ -192,7 +193,7 @@ export function CategorizeBar({
       (finalType === "general" && topicId);
 
     onSave({
-      title: title.trim() || undefined, // Include title if provided
+      title: initialTitle.trim() || undefined, // Pass through title from capture overlay
       type: finalType,
       projectId,
       topicId,
@@ -238,24 +239,6 @@ export function CategorizeBar({
                   — optional, you can always file later
                 </span>
               </h3>
-            </div>
-
-            {/* Title input - full width, positioned first */}
-            <div className="mb-4">
-              <label
-                className="mb-1.5 block text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
-                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
-              >
-                Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Optional — give this note a name"
-                className="w-full rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] transition-colors placeholder:text-[var(--ink-soft)] focus:border-[var(--accent)] focus:outline-none"
-                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
-              />
             </div>
 
             {/* Type toggle row */}
