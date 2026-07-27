@@ -39,6 +39,7 @@ export function CaptureOverlay() {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initializedRef = useRef(false);
+  const lastSavedTextRef = useRef<string>(""); // Track what text was last saved to server
 
   // NEW: Save with prefilled context (skip categorize bar)
   // Defined early so it can be used in useEffect hooks
@@ -86,7 +87,8 @@ export function CaptureOverlay() {
         },
       );
 
-      // Success! Clear the draft and close
+      // Success! Track what we saved and close
+      lastSavedTextRef.current = text.trim();
       clearDraft();
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -98,9 +100,11 @@ export function CaptureOverlay() {
       setSaveStatus("failed");
       setSaveError(error instanceof Error ? error.message : "Unknown error");
 
+      const textToSave = text.trim();
+      lastSavedTextRef.current = textToSave;
       pendingSavesManager.addPending({
         id: noteId,
-        text: text.trim(),
+        text: textToSave,
         type: prefilledContext.type,
         meetingId: prefilledContext.meetingId,
         topicId: prefilledContext.topicId,
@@ -162,18 +166,29 @@ export function CaptureOverlay() {
           setSaveError(status.error);
         }
 
-        // If background retry succeeded, close the overlay
+        // If background retry succeeded, only close if user hasn't typed more
         if (status.state === "saved") {
-          clearDraft();
-          queryClient.invalidateQueries({ queryKey: ["notes"] });
-          queryClient.invalidateQueries({ queryKey: ["note-counts"] });
-          closeCapture();
+          // Check if the current text matches what was saved
+          // If user typed more after the save started, keep the overlay open
+          const currentText = text.trim();
+          if (currentText === lastSavedTextRef.current || !currentText) {
+            // Text hasn't changed since save - safe to close
+            clearDraft();
+            queryClient.invalidateQueries({ queryKey: ["notes"] });
+            queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+            closeCapture();
+          } else {
+            // User typed more after save - keep overlay open but update UI
+            queryClient.invalidateQueries({ queryKey: ["notes"] });
+            queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+            // Status will show "saved" briefly, then user can save again
+          }
         }
       }
     });
 
     return unsubscribe;
-  }, [noteId, queryClient, closeCapture]);
+  }, [noteId, text, queryClient, closeCapture]);
 
   // Extract the finish logic so it can be called from both keyboard shortcut and button
   const handleFinish = useCallback(() => {
@@ -332,7 +347,8 @@ export function CaptureOverlay() {
         },
       );
 
-      // Success! Clear the draft and close
+      // Success! Track what we saved and close
+      lastSavedTextRef.current = text.trim();
       clearDraft();
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -350,9 +366,11 @@ export function CaptureOverlay() {
         (data.type === "meeting" && !data.meetingId) ||
         (data.type === "general" && !data.topicId);
 
+      const textToSave = text.trim();
+      lastSavedTextRef.current = textToSave;
       pendingSavesManager.addPending({
         id: noteId,
-        text: text.trim(),
+        text: textToSave,
         type: data.type, // Keep the type the user selected
         meetingId: shouldBeUnsorted ? undefined : data.meetingId,
         topicId: shouldBeUnsorted ? undefined : data.topicId,
@@ -410,7 +428,8 @@ export function CaptureOverlay() {
         },
       );
 
-      // Success! Clear the draft and close
+      // Success! Track what we saved and close
+      lastSavedTextRef.current = text.trim();
       clearDraft();
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -422,9 +441,11 @@ export function CaptureOverlay() {
       setSaveStatus("failed");
       setSaveError(error instanceof Error ? error.message : "Unknown error");
 
+      const textToSave = text.trim();
+      lastSavedTextRef.current = textToSave;
       pendingSavesManager.addPending({
         id: noteId,
-        text: text.trim(),
+        text: textToSave,
         type: "general",
         isUnsorted: true,
         timestamp: Date.now(),

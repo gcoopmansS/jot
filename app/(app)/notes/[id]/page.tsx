@@ -39,6 +39,7 @@ export default function NotePage() {
   const [saveError, setSaveError] = useState<string>("");
   const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const saveSequenceRef = useRef(0); // Track save sequence to prevent stale responses
 
   // Fetch the note
   const { data: note, isLoading } = useQuery<Note>({
@@ -52,11 +53,13 @@ export default function NotePage() {
     },
   });
 
-  // Initialize text when note loads
+  // Initialize text when note loads (ONLY on first load, never from autosave refetches)
+  const initialLoadRef = useRef(true);
   useEffect(() => {
-    if (note) {
+    if (note && initialLoadRef.current) {
       setText(note.text);
       setTitle(note.title || "");
+      initialLoadRef.current = false;
       // Auto-show categorize bar if this is an unsorted note or if ?file=true
       if (note.is_unsorted || shouldShowFilePrompt) {
         setShowCategorize(true);
@@ -75,10 +78,11 @@ export default function NotePage() {
           setSaveError(status.error);
         }
 
-        // If background retry succeeded, refresh the UI
+        // If background retry succeeded, refresh the sidebar/list queries only
+        // NEVER refetch the current note - local editor state is the source of truth
         if (status.state === "saved") {
           queryClient.invalidateQueries({ queryKey: ["notes"] });
-          queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+          queryClient.invalidateQueries({ queryKey: ["note-counts"] });
           setHasChanges(false);
         }
       }
@@ -114,6 +118,10 @@ export default function NotePage() {
       return;
     }
 
+    // Capture the sequence number and text at save-start time
+    const thisSequence = ++saveSequenceRef.current;
+    const textToSave = text.trim();
+
     setSaveStatus("saving");
     setSaveError("");
 
@@ -124,7 +132,7 @@ export default function NotePage() {
           const response = await fetch(`/api/notes/${noteId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: text.trim() }),
+            body: JSON.stringify({ text: textToSave }),
           });
 
           if (!response.ok) {
@@ -146,11 +154,17 @@ export default function NotePage() {
         },
       );
 
-      // Success!
-      setSaveStatus("saved");
+      // Success! But only update status if this is still the latest save
+      // (a newer save may have started while this one was in flight)
+      if (thisSequence === saveSequenceRef.current) {
+        setSaveStatus("saved");
+        setHasChanges(false);
+      }
+
+      // Invalidate list/sidebar queries only - NEVER refetch the current note
+      // The local editor state is the source of truth, not the server
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-      setHasChanges(false);
+      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
     } catch (error) {
       // All retries failed - add to pending queue for background retry
       console.error("Failed to save note after retries:", error);

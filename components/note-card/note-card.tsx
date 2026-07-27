@@ -177,7 +177,12 @@ export function NoteCard({
 
       if (!cleanText) {
         // No body content after heading
-        return { hasTitle: true, title: note.title, snippet: "", needsEllipsis: false };
+        return {
+          hasTitle: true,
+          title: note.title,
+          snippet: "",
+          needsEllipsis: false,
+        };
       }
 
       const snippet = cleanText.slice(0, 80);
@@ -203,7 +208,12 @@ export function NoteCard({
 
       if (!cleanText) {
         // Heading only, no content after it
-        return { hasTitle: true, title: extractedTitle, snippet: "", needsEllipsis: false };
+        return {
+          hasTitle: true,
+          title: extractedTitle,
+          snippet: "",
+          needsEllipsis: false,
+        };
       }
 
       const snippet = cleanText.slice(0, 80);
