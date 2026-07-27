@@ -8,6 +8,7 @@ import { Inbox } from "lucide-react";
 import { Note } from "@/lib/types";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Unsorted notes page - the inbox for notes that haven't been filed yet.
@@ -16,13 +17,15 @@ import { AnimatePresence } from "framer-motion";
  * This is where notes go when the user skips the "What's this about?" prompt.
  */
 export default function UnsortedPage() {
+  const { data: currentUser } = useCurrentUser();
+
   // Fetch unsorted notes using TanStack Query
   const {
     data: notes,
     isLoading,
     error,
   } = useQuery<Note[]>({
-    queryKey: ["notes", "unsorted"],
+    queryKey: ["notes", "unsorted", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/notes?is_unsorted=true");
       if (!response.ok) {
@@ -30,6 +33,7 @@ export default function UnsortedPage() {
       }
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
   return (

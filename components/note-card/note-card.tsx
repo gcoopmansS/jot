@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Strip markdown formatting characters from text for clean previews.
@@ -74,6 +75,7 @@ export function NoteCard({
   const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { data: currentUser } = useCurrentUser();
 
   // Type guard to check if note has location data
   const noteWithLocation = note as NoteWithLocation;
@@ -99,14 +101,24 @@ export function NoteCard({
       };
     }) => {
       // Invalidate queries immediately - AnimatePresence will handle the exit animation
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      queryClient.invalidateQueries({ queryKey: ["unsorted-notes"] });
-      queryClient.invalidateQueries({ queryKey: ["meeting-notes"] });
-      queryClient.invalidateQueries({ queryKey: ["topic-notes"] });
-      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["unsorted-notes", currentUser?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["meeting-notes", currentUser?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["topic-notes", currentUser?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["note-counts", currentUser?.id],
+      });
       // CRITICAL: Also invalidate meetings and topics so sidebar updates when containers are auto-deleted
-      queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      queryClient.invalidateQueries({ queryKey: ["topics"] });
+      queryClient.invalidateQueries({
+        queryKey: ["meetings", currentUser?.id],
+      });
+      queryClient.invalidateQueries({ queryKey: ["topics", currentUser?.id] });
       setShowDeleteDialog(false);
 
       // Check if we need to redirect due to automatic cleanup

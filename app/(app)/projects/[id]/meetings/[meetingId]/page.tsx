@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import type { Note, Meeting, Project } from "@/lib/types";
 import { AnimatePresence } from "framer-motion";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Meeting detail page - shows all notes for a specific meeting.
@@ -21,20 +22,22 @@ export default function MeetingPage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
   const projectId = params.id as string;
+  const { data: currentUser } = useCurrentUser();
 
   // Fetch the project for breadcrumb
   const { data: project } = useQuery<Project>({
-    queryKey: ["project", projectId],
+    queryKey: ["project", projectId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${projectId}`);
       if (!response.ok) throw new Error("Failed to fetch project");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
   // Fetch the meeting
   const { data: meeting, isLoading: meetingLoading } = useQuery<Meeting>({
-    queryKey: ["meeting", meetingId],
+    queryKey: ["meeting", meetingId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/meetings");
       if (!response.ok) throw new Error("Failed to fetch meetings");
@@ -43,11 +46,12 @@ export default function MeetingPage() {
       if (!found) throw new Error("Meeting not found");
       return found;
     },
+    enabled: !!currentUser?.id,
   });
 
   // Fetch all notes for this meeting
   const { data: notes = [], isLoading: notesLoading } = useQuery<Note[]>({
-    queryKey: ["notes", "meeting", meetingId],
+    queryKey: ["notes", "meeting", meetingId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/notes");
       if (!response.ok) throw new Error("Failed to fetch notes");
@@ -61,6 +65,7 @@ export default function MeetingPage() {
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
     },
+    enabled: !!currentUser?.id,
   });
 
   if (meetingLoading) {

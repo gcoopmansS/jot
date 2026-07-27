@@ -10,6 +10,7 @@ import { CategorizeBar } from "@/components/capture/categorize-bar";
 import { retryWithBackoff } from "@/lib/retry";
 import { pendingSavesManager } from "@/lib/pending-saves";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Note detail page - shows a single note in full-screen editable view.
@@ -28,6 +29,7 @@ export default function NotePage() {
   const queryClient = useQueryClient();
   const noteId = params.id as string;
   const shouldShowFilePrompt = searchParams.get("file") === "true";
+  const { data: currentUser } = useCurrentUser();
 
   const [text, setText] = useState("");
   const [title, setTitle] = useState("");
@@ -44,7 +46,7 @@ export default function NotePage() {
 
   // Fetch the note
   const { data: note, isLoading } = useQuery<Note>({
-    queryKey: ["note", noteId],
+    queryKey: ["note", noteId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch(`/api/notes/${noteId}`);
       if (!response.ok) {
@@ -52,6 +54,7 @@ export default function NotePage() {
       }
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
   // Initialize text when note loads (ONLY on first load, never from autosave refetches)
@@ -82,8 +85,12 @@ export default function NotePage() {
         // If background retry succeeded, refresh the sidebar/list queries only
         // NEVER refetch the current note - local editor state is the source of truth
         if (status.state === "saved") {
-          queryClient.invalidateQueries({ queryKey: ["notes"] });
-          queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+          queryClient.invalidateQueries({
+            queryKey: ["notes", currentUser?.id],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["note-counts", currentUser?.id],
+          });
           setHasChanges(false);
         }
       }
@@ -166,14 +173,18 @@ export default function NotePage() {
         }
 
         // Invalidate list/sidebar queries always
-        queryClient.invalidateQueries({ queryKey: ["notes"] });
-        queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+        queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
+        queryClient.invalidateQueries({
+          queryKey: ["note-counts", currentUser?.id],
+        });
 
         // For final saves (on close), also invalidate this note's cache
         // so it's fresh on next open. During continuous autosave, DON'T
         // invalidate to prevent the race condition with live typing.
         if (isFinalSave) {
-          queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+          queryClient.invalidateQueries({
+            queryKey: ["note", noteId, currentUser?.id],
+          });
         }
       } catch (error) {
         // All retries failed - add to pending queue for background retry
@@ -210,9 +221,11 @@ export default function NotePage() {
     }
     // Always invalidate cache on close, even if no pending changes
     // This ensures fresh data when note is reopened
-    queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+    queryClient.invalidateQueries({
+      queryKey: ["note", noteId, currentUser?.id],
+    });
     router.back();
-  }, [hasChanges, handleSave, router, queryClient, noteId]);
+  }, [hasChanges, handleSave, router, queryClient, noteId, currentUser?.id]);
 
   // Handle categorization from the categorize bar
   const handleCategorize = async (data: {
@@ -247,7 +260,7 @@ export default function NotePage() {
       }
 
       // Invalidate all relevant queries
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
       queryClient.invalidateQueries({ queryKey: ["note", noteId] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
 

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Project } from "@/lib/types";
 import { AutocompleteInput } from "./autocomplete-input";
 import { Button } from "@/components/ui/button";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Categorize bar shown after capturing a note.
@@ -42,6 +43,7 @@ export function CategorizeBar({
   onBack,
 }: CategorizeBarProps) {
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
   // Title is no longer edited here - it's set in the capture overlay/note view
   // We still receive it via props to pass it through on save
   const [type, setType] = useState<"meeting" | "general" | null>(null);
@@ -152,7 +154,9 @@ export function CategorizeBar({
               const newMeeting = await response.json();
               meetingId = newMeeting.id;
               // Invalidate meetings cache so sidebar updates
-              queryClient.invalidateQueries({ queryKey: ["meetings"] });
+              queryClient.invalidateQueries({
+                queryKey: ["meetings", currentUser?.id],
+              });
             }
           } catch (error) {
             console.error("Error creating meeting:", error);
@@ -177,7 +181,9 @@ export function CategorizeBar({
               const newTopic = await response.json();
               topicId = newTopic.id;
               // Invalidate topics cache so sidebar updates
-              queryClient.invalidateQueries({ queryKey: ["topics"] });
+              queryClient.invalidateQueries({
+                queryKey: ["topics", currentUser?.id],
+              });
             }
           } catch (error) {
             console.error("Error creating topic:", error);

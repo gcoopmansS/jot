@@ -10,6 +10,7 @@ import { pendingSavesManager } from "@/lib/pending-saves";
 import { CategorizeBar } from "./categorize-bar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Full-screen capture overlay for writing notes.
@@ -23,11 +24,14 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
  * RELIABILITY LAYERS:
  * - Layer 1: Drafts auto-saved to localStorage every 500ms (before any server save)
  * - Layer 2: Client-side UUID generation + retry with exponential backoff + network-aware background retries
+ *
+ * SECURITY: Drafts are now user-scoped to prevent data leakage between accounts.
  */
 export function CaptureOverlay() {
   const { isOpen, initialText, initialId, prefilledContext, closeCapture } =
     useCaptureOverlay();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
   const [noteId, setNoteId] = useState<string>("");
   const [text, setText] = useState("");
   const [title, setTitle] = useState("");
@@ -89,7 +93,7 @@ export function CaptureOverlay() {
 
       // Success! Track what we saved and close
       lastSavedTextRef.current = text.trim();
-      clearDraft();
+      if (currentUser?.id) clearDraft(currentUser.id);
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
@@ -115,7 +119,15 @@ export function CaptureOverlay() {
 
       // Don't close or clear the draft - keep it for recovery
     }
-  }, [text, noteId, prefilledContext, title, closeCapture, queryClient]);
+  }, [
+    text,
+    noteId,
+    prefilledContext,
+    title,
+    closeCapture,
+    queryClient,
+    currentUser?.id,
+  ]);
 
   // Generate or restore note ID when overlay opens
   useEffect(() => {
@@ -127,24 +139,27 @@ export function CaptureOverlay() {
   }, [isOpen, initialId, noteId]);
 
   // Debounced draft save: save to localStorage 500ms after user stops typing
-  const debouncedSaveDraft = useCallback((id: string, value: string) => {
-    // Clear any existing timer
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    // Set a new timer to save after 500ms
-    saveTimerRef.current = setTimeout(() => {
-      if (value.trim()) {
-        saveDraft(id, value);
+  const debouncedSaveDraft = useCallback(
+    (userId: string, id: string, value: string) => {
+      // Clear any existing timer
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
       }
-    }, 500);
-  }, []);
+
+      // Set a new timer to save after 500ms
+      saveTimerRef.current = setTimeout(() => {
+        if (value.trim()) {
+          saveDraft(userId, id, value);
+        }
+      }, 500);
+    },
+    [],
+  );
 
   // Save draft whenever text changes
   useEffect(() => {
-    if (isOpen && text && noteId) {
-      debouncedSaveDraft(noteId, text);
+    if (isOpen && text && noteId && currentUser?.id) {
+      debouncedSaveDraft(currentUser.id, noteId, text);
     }
 
     // Cleanup timer on unmount
@@ -153,7 +168,7 @@ export function CaptureOverlay() {
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [text, isOpen, noteId, debouncedSaveDraft]);
+  }, [text, isOpen, noteId, currentUser, debouncedSaveDraft]);
 
   // Listen for save status changes from the pending saves manager
   useEffect(() => {
@@ -173,7 +188,7 @@ export function CaptureOverlay() {
           const currentText = text.trim();
           if (currentText === lastSavedTextRef.current || !currentText) {
             // Text hasn't changed since save - safe to close
-            clearDraft();
+            if (currentUser?.id) clearDraft(currentUser.id);
             queryClient.invalidateQueries({ queryKey: ["notes"] });
             queryClient.invalidateQueries({ queryKey: ["note-counts"] });
             closeCapture();
@@ -188,7 +203,7 @@ export function CaptureOverlay() {
     });
 
     return unsubscribe;
-  }, [noteId, text, queryClient, closeCapture]);
+  }, [noteId, text, queryClient, closeCapture, currentUser?.id]);
 
   // Extract the finish logic so it can be called from both keyboard shortcut and button
   const handleFinish = useCallback(() => {
@@ -271,7 +286,7 @@ export function CaptureOverlay() {
 
   const handleDiscardConfirm = () => {
     // Clear the draft when explicitly discarding
-    clearDraft();
+    if (currentUser?.id) clearDraft(currentUser.id);
     // Text will be thrown away when overlay closes (reset effect above)
     closeCapture();
   };
@@ -349,7 +364,7 @@ export function CaptureOverlay() {
 
       // Success! Track what we saved and close
       lastSavedTextRef.current = text.trim();
-      clearDraft();
+      if (currentUser?.id) clearDraft(currentUser.id);
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
@@ -430,7 +445,7 @@ export function CaptureOverlay() {
 
       // Success! Track what we saved and close
       lastSavedTextRef.current = text.trim();
-      clearDraft();
+      if (currentUser?.id) clearDraft(currentUser.id);
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });

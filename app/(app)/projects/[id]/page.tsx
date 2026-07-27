@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { Project, Meeting, NoteTopic } from "@/lib/types";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Project overview page - shows a summary/index of all meetings and topics in a project.
@@ -24,10 +25,11 @@ import type { Project, Meeting, NoteTopic } from "@/lib/types";
 export default function ProjectOverviewPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const { data: currentUser } = useCurrentUser();
 
   // Fetch the project
   const { data: project, isLoading: projectLoading } = useQuery<Project>({
-    queryKey: ["project", projectId],
+    queryKey: ["project", projectId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/projects");
       if (!response.ok) throw new Error("Failed to fetch projects");
@@ -36,37 +38,40 @@ export default function ProjectOverviewPage() {
       if (!found) throw new Error("Project not found");
       return found;
     },
+    enabled: !!currentUser?.id,
   });
 
   // Fetch meetings for this project
   const { data: meetings = [], isLoading: meetingsLoading } = useQuery<
     Meeting[]
   >({
-    queryKey: ["meetings", projectId],
+    queryKey: ["meetings", projectId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/meetings");
       if (!response.ok) throw new Error("Failed to fetch meetings");
       const allMeetings = await response.json();
       return allMeetings.filter((m: Meeting) => m.project_id === projectId);
     },
+    enabled: !!currentUser?.id,
   });
 
   // Fetch topics for this project
   const { data: topics = [], isLoading: topicsLoading } = useQuery<NoteTopic[]>(
     {
-      queryKey: ["topics", projectId],
+      queryKey: ["topics", projectId, currentUser?.id],
       queryFn: async () => {
         const response = await fetch("/api/topics");
         if (!response.ok) throw new Error("Failed to fetch topics");
         const allTopics = await response.json();
         return allTopics.filter((t: NoteTopic) => t.project_id === projectId);
       },
+      enabled: !!currentUser?.id,
     },
   );
 
   // Fetch note counts
   const { data: noteCounts } = useQuery({
-    queryKey: ["note-counts"],
+    queryKey: ["note-counts", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/notes");
       if (!response.ok) throw new Error("Failed to fetch notes");

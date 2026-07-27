@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import type { Note, NoteTopic, Project } from "@/lib/types";
 import { AnimatePresence } from "framer-motion";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Topic detail page - shows all notes for a specific topic.
@@ -20,20 +21,22 @@ export default function TopicPage() {
   const params = useParams();
   const topicId = params.topicId as string;
   const projectId = params.id as string;
+  const { data: currentUser } = useCurrentUser();
 
   // Fetch the project for breadcrumb
   const { data: project } = useQuery<Project>({
-    queryKey: ["project", projectId],
+    queryKey: ["project", projectId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${projectId}`);
       if (!response.ok) throw new Error("Failed to fetch project");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
   // Fetch the topic
   const { data: topic, isLoading: topicLoading } = useQuery<NoteTopic>({
-    queryKey: ["topic", topicId],
+    queryKey: ["topic", topicId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/topics");
       if (!response.ok) throw new Error("Failed to fetch topics");
@@ -42,11 +45,12 @@ export default function TopicPage() {
       if (!found) throw new Error("Topic not found");
       return found;
     },
+    enabled: !!currentUser?.id,
   });
 
   // Fetch all notes for this topic
   const { data: notes = [], isLoading: notesLoading } = useQuery<Note[]>({
-    queryKey: ["notes", "topic", topicId],
+    queryKey: ["notes", "topic", topicId, currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/notes");
       if (!response.ok) throw new Error("Failed to fetch notes");
@@ -60,6 +64,7 @@ export default function TopicPage() {
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
     },
+    enabled: !!currentUser?.id,
   });
 
   if (topicLoading) {

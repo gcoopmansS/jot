@@ -15,6 +15,8 @@ import type {
 } from "@/lib/types";
 import { AnimatePresence } from "framer-motion";
 import { useMemo } from "react";
+import { createClient } from "@/lib/supabase";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Recent page - shows all notes across all projects, sorted by most recent first.
@@ -24,9 +26,11 @@ import { useMemo } from "react";
  * Shows type badges and location tags since items are mixed.
  */
 export default function EverythingPage() {
-  // Fetch all notes
+  const { data: currentUser } = useCurrentUser();
+
+  // SECURITY: Fetch all notes scoped by user ID to prevent data leakage
   const { data: notes = [], isLoading: notesLoading } = useQuery<Note[]>({
-    queryKey: ["notes"],
+    queryKey: ["notes", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/notes");
       if (!response.ok) throw new Error("Failed to fetch notes");
@@ -37,36 +41,40 @@ export default function EverythingPage() {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
     },
+    enabled: !!currentUser?.id,
   });
 
-  // Fetch projects for location enrichment
+  // SECURITY: Fetch projects scoped by user ID for location enrichment
   const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ["projects"],
+    queryKey: ["projects", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/projects");
       if (!response.ok) throw new Error("Failed to fetch projects");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
-  // Fetch meetings for location enrichment
+  // SECURITY: Fetch meetings scoped by user ID for location enrichment
   const { data: meetings = [] } = useQuery<Meeting[]>({
-    queryKey: ["meetings"],
+    queryKey: ["meetings", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/meetings");
       if (!response.ok) throw new Error("Failed to fetch meetings");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
-  // Fetch topics for location enrichment
+  // SECURITY: Fetch topics scoped by user ID for location enrichment
   const { data: topics = [] } = useQuery<NoteTopic[]>({
-    queryKey: ["topics"],
+    queryKey: ["topics", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/topics");
       if (!response.ok) throw new Error("Failed to fetch topics");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
   // Enrich notes with location information
@@ -94,6 +102,21 @@ export default function EverythingPage() {
     });
   }, [notes, projects, meetings, topics]);
 
+  // Determine if this is a brand-new account (first-run state)
+  // Show the special first-run message only if:
+  // 1. User has zero notes, AND
+  // 2. Account was created within the last hour
+  // This ensures the friendly first-run message only shows to genuinely new users,
+  // and disappears once they've started using the app (even if they delete all notes later).
+  const isFirstRun = useMemo(() => {
+    if (!currentUser || notes.length > 0) return false;
+
+    const accountCreatedAt = new Date(currentUser.created_at);
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    return accountCreatedAt > oneHourAgo;
+  }, [currentUser, notes.length]);
+
   const isLoading = notesLoading;
 
   return (
@@ -104,11 +127,30 @@ export default function EverythingPage() {
           <LoadingPage />
         ) : enrichedNotes.length === 0 ? (
           <div className="max-w-3xl mx-auto">
-            <EmptyState
-              icon={FileText}
-              title="No notes yet"
-              description="You haven't captured anything. Click + New note or press ⌘N to start writing."
-            />
+            {isFirstRun ? (
+              // First-run empty state for brand-new accounts
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center max-w-md">
+                  <p
+                    className="text-lg text-[var(--ink-soft)]"
+                    style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                  >
+                    Hit{" "}
+                    <strong className="text-[var(--ink)] font-semibold">
+                      + New note{" "}
+                    </strong>{" "}
+                    to try it — that&apos;s really all there is to start.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // Standard empty state for accounts that have used the app before
+              <EmptyState
+                icon={FileText}
+                title="No notes yet"
+                description="You haven't captured anything. Click + New note or press ⌘N to start writing."
+              />
+            )}
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-4">

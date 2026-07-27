@@ -17,6 +17,7 @@ import type { Meeting, Note } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useCaptureOverlay } from "@/lib/capture-context";
 import Link from "next/link";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Series Banner - shown above the note list in Meeting detail views.
@@ -73,6 +74,7 @@ export function SeriesBanner({
   const [isLastSessionExpanded, setIsLastSessionExpanded] = useState(false);
   const [cadenceInput, setCadenceInput] = useState(meeting.cadence || "");
   const [attendeesInput, setAttendeesInput] = useState(meeting.attendees || "");
+  const { data: currentUser } = useCurrentUser();
 
   // Mutation to update meeting
   const updateMeetingMutation = useMutation({
@@ -87,9 +89,14 @@ export function SeriesBanner({
     },
     onSuccess: (updatedMeeting) => {
       // Invalidate the meetings list query (used by sidebar)
-      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      queryClient.invalidateQueries({
+        queryKey: ["meetings", currentUser?.id],
+      });
       // Optimistically update the specific meeting query used by this page
-      queryClient.setQueryData(["meeting", meeting.id], updatedMeeting);
+      queryClient.setQueryData(
+        ["meeting", meeting.id, currentUser?.id],
+        updatedMeeting,
+      );
       // Close the edit form
       setIsEditing(false);
     },

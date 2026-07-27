@@ -9,6 +9,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { SearchResults } from "@/components/search-results/search-results";
 import { NoteWithLocation } from "@/lib/types";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Custom hook for debouncing a value.
@@ -52,6 +53,7 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
   const { openCapture } = useCaptureOverlay();
   const [searchQuery, setSearchQuery] = useState("");
   const [shouldShowResults, setShouldShowResults] = useState(true);
+  const { data: currentUser } = useCurrentUser();
 
   // Ref to the search input - used to maintain focus
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -66,7 +68,7 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
   // Query the search API with the debounced value
   // Only enable when there's a non-empty debounced query
   const { data, isLoading } = useQuery<{ results: NoteWithLocation[] }>({
-    queryKey: ["search", debouncedQuery],
+    queryKey: ["search", debouncedQuery, currentUser?.id],
     queryFn: async () => {
       const response = await fetch(
         `/api/search?q=${encodeURIComponent(debouncedQuery)}`,
@@ -76,7 +78,7 @@ export function AppHeader({ title }: { title: string | ReactNode }) {
       }
       return response.json();
     },
-    enabled: debouncedQuery.trim().length > 0,
+    enabled: debouncedQuery.trim().length > 0 && !!currentUser?.id,
     // Keep previous data while fetching new results (smoother UX)
     placeholderData: (prev) => prev,
   });

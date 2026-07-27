@@ -24,6 +24,8 @@ import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
+import { clearAllDrafts } from "@/lib/draft-storage";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
  * Sidebar component for the Jot app.
@@ -42,6 +44,7 @@ export function Sidebar() {
   const router = useRouter();
   const supabase = createClient();
   const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
     new Set(),
   );
@@ -89,45 +92,48 @@ export function Sidebar() {
     fetchUser();
   }, [supabase]);
 
-  // Fetch projects from API
+  // SECURITY: Fetch projects scoped by user ID to prevent data leakage
   const { data: projects = [], isLoading: projectsLoading } = useQuery<
     Project[]
   >({
-    queryKey: ["projects"],
+    queryKey: ["projects", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/projects");
       if (!response.ok) throw new Error("Failed to fetch projects");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
-  // Fetch all meetings for all projects
+  // SECURITY: Fetch meetings scoped by user ID to prevent data leakage
   const { data: meetings = [], isLoading: meetingsLoading } = useQuery<
     Meeting[]
   >({
-    queryKey: ["meetings"],
+    queryKey: ["meetings", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/meetings");
       if (!response.ok) throw new Error("Failed to fetch meetings");
       return response.json();
     },
+    enabled: !!currentUser?.id,
   });
 
-  // Fetch all topics for all projects
+  // SECURITY: Fetch topics scoped by user ID to prevent data leakage
   const { data: topics = [], isLoading: topicsLoading } = useQuery<NoteTopic[]>(
     {
-      queryKey: ["topics"],
+      queryKey: ["topics", currentUser?.id],
       queryFn: async () => {
         const response = await fetch("/api/topics");
         if (!response.ok) throw new Error("Failed to fetch topics");
         return response.json();
       },
+      enabled: !!currentUser?.id,
     },
   );
 
-  // Fetch note counts
+  // SECURITY: Fetch note counts scoped by user ID to prevent data leakage
   const { data: noteCounts } = useQuery({
-    queryKey: ["note-counts"],
+    queryKey: ["note-counts", currentUser?.id],
     queryFn: async () => {
       const response = await fetch("/api/notes");
       if (!response.ok) throw new Error("Failed to fetch notes");
@@ -176,7 +182,9 @@ export function Sidebar() {
       return response.json();
     },
     onSuccess: (newProject) => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({
+        queryKey: ["projects", currentUser?.id],
+      });
       setIsCreatingProject(false);
       setNewProjectName("");
       // Auto-expand the newly created project
@@ -185,6 +193,12 @@ export function Sidebar() {
   });
 
   const handleSignOut = async () => {
+    console.log("[Security] User signing out - clearing cache and drafts");
+    // Clear ALL cached data and drafts before signing out
+    queryClient.clear();
+    clearAllDrafts();
+
+    // Then sign out (this will also trigger the auth state listener)
     await supabase.auth.signOut();
     router.push("/auth/sign-in");
     router.refresh();
@@ -285,11 +299,19 @@ export function Sidebar() {
       });
 
       if (response.ok) {
-        queryClient.invalidateQueries({ queryKey: ["projects"] });
-        queryClient.invalidateQueries({ queryKey: ["meetings"] });
-        queryClient.invalidateQueries({ queryKey: ["topics"] });
-        queryClient.invalidateQueries({ queryKey: ["notes"] });
-        queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+        queryClient.invalidateQueries({
+          queryKey: ["projects", currentUser?.id],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["meetings", currentUser?.id],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["topics", currentUser?.id],
+        });
+        queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
+        queryClient.invalidateQueries({
+          queryKey: ["note-counts", currentUser?.id],
+        });
 
         // Navigate away if we're on a page for this project
         if (pathname.startsWith(`/projects/${projectToDelete.id}`)) {

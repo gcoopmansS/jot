@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearAllDrafts } from "@/lib/draft-storage";
 
 /**
  * Account Settings page.
@@ -21,6 +23,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const queryClient = useQueryClient();
 
   // Email update state
   const [currentEmail, setCurrentEmail] = useState<string>("");
@@ -274,7 +277,10 @@ export default function SettingsPage() {
         return;
       }
 
-      // Sign out and redirect to landing page
+      // Sign out and redirect to landing page (clear cache and drafts for security)
+      console.log("[Security] Account deleted - clearing cache and drafts");
+      queryClient.clear();
+      clearAllDrafts();
       await supabase.auth.signOut();
       router.push("/?deleted=true");
     } catch (error) {
