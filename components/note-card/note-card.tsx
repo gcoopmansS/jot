@@ -32,6 +32,8 @@ function stripMarkdown(text: string): string {
       .replace(/\[(.+?)\]\(.+?\)/g, "$1")
       // Remove blockquote markers (>)
       .replace(/^>\s+/gm, "")
+      // Remove task list markers (- [ ] and - [x])
+      .replace(/^[\s]*-\s*\[[x\s]\]\s+/gim, "")
       // Remove list markers (-, *, +, 1.)
       .replace(/^[\s]*[-*+]\s+/gm, "")
       .replace(/^[\s]*\d+\.\s+/gm, "")
@@ -303,27 +305,49 @@ export function NoteCard({
         )}
         style={{ boxShadow: "var(--shadow-card)" }}
       >
-        {/* Header: Type badge + location tag + timestamp + delete button */}
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {/* Show type badge in mixed views or unsorted view (when type was selected) */}
-            {viewContext === "mixed" && (
+        {/* Mixed views: Full header with type badge + location + timestamp + delete */}
+        {viewContext === "mixed" && (
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               <Badge variant={note.type === "meeting" ? "meeting" : "general"}>
                 {note.type}
               </Badge>
-            )}
-            {/* Show location tag in mixed views */}
-            {viewContext === "mixed" && hasLocation && (
+              {hasLocation && (
+                <span
+                  className="text-xs text-[var(--ink-soft)] truncate"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  {noteWithLocation.project_name} /{" "}
+                  {noteWithLocation.location_name}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               <span
-                className="text-xs text-[var(--ink-soft)] truncate"
-                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                className="text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
+                style={{
+                  fontFamily: "var(--font-ibm-plex-mono)",
+                }}
               >
-                {noteWithLocation.project_name} /{" "}
-                {noteWithLocation.location_name}
+                {formattedDate}
               </span>
-            )}
+              {isHovered && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                  className="flex h-6 w-6 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--paper)] disabled:opacity-50 cursor-pointer"
+                  aria-label="Delete note"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+        )}
+
+        {/* Specific views: Compact header with just timestamp + delete, no vertical gap */}
+        {viewContext === "specific" && (
+          <div className="mb-2 flex items-center justify-end gap-2">
             <span
               className="text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
               style={{
@@ -332,7 +356,6 @@ export function NoteCard({
             >
               {formattedDate}
             </span>
-            {/* Delete button - appears on hover */}
             {isHovered && (
               <button
                 onClick={handleDelete}
@@ -344,7 +367,31 @@ export function NoteCard({
               </button>
             )}
           </div>
-        </div>
+        )}
+
+        {/* Unsorted view: Just timestamp + delete in compact layout */}
+        {viewContext === "unsorted" && (
+          <div className="mb-2 flex items-center justify-end gap-2">
+            <span
+              className="text-[11px] uppercase tracking-wide text-[var(--ink-soft)]"
+              style={{
+                fontFamily: "var(--font-ibm-plex-mono)",
+              }}
+            >
+              {formattedDate}
+            </span>
+            {isHovered && (
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="flex h-6 w-6 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--paper)] disabled:opacity-50 cursor-pointer"
+                aria-label="Delete note"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Note content - title (if present) + snippet */}
         {preview.hasTitle && (

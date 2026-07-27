@@ -30,6 +30,8 @@ function stripMarkdown(text: string): string {
       .replace(/\[(.+?)\]\(.+?\)/g, "$1")
       // Remove blockquote markers (>)
       .replace(/^>\s+/gm, "")
+      // Remove task list markers (- [ ] and - [x])
+      .replace(/^[\s]*-\s*\[[x\s]\]\s+/gim, "")
       // Remove list markers (-, *, +, 1.)
       .replace(/^[\s]*[-*+]\s+/gm, "")
       .replace(/^[\s]*\d+\.\s+/gm, "")

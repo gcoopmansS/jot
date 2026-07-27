@@ -53,6 +53,7 @@ function stripMarkdown(text: string): string {
     .replace(/`(.+?)`/g, "$1")
     .replace(/\[(.+?)\]\(.+?\)/g, "$1")
     .replace(/^>\s+/gm, "")
+    .replace(/^[\s]*-\s*\[[x\s]\]\s+/gim, "")
     .replace(/^[\s]*[-*+]\s+/gm, "")
     .replace(/^[\s]*\d+\.\s+/gm, "")
     .replace(/^[-*_]{3,}$/gm, "")

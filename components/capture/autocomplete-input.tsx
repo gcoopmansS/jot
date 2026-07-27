@@ -84,7 +84,8 @@ export function AutocompleteInput({
     const spaceAbove = inputRect.top - spacing;
 
     // Decide whether to open upward or downward
-    const shouldOpenUpward = spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
+    const shouldOpenUpward =
+      spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
     setOpenUpward(shouldOpenUpward);
 
     // Calculate top position

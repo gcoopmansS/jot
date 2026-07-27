@@ -40,6 +40,7 @@ export default function NotePage() {
   const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const saveSequenceRef = useRef(0); // Track save sequence to prevent stale responses
+  const isClosingRef = useRef(false); // Track if we're in the process of closing
 
   // Fetch the note
   const { data: note, isLoading } = useQuery<Note>({
@@ -113,90 +114,104 @@ export default function NotePage() {
   };
 
   // Save the note with automatic retry
-  const handleSave = useCallback(async () => {
-    if (!hasChanges || !text.trim()) {
-      return;
-    }
+  // isFinalSave: true when closing/navigating away (invalidates cache for next open)
+  const handleSave = useCallback(
+    async (isFinalSave: boolean = false) => {
+      if (!hasChanges || !text.trim()) {
+        return;
+      }
 
-    // Capture the sequence number and text at save-start time
-    const thisSequence = ++saveSequenceRef.current;
-    const textToSave = text.trim();
+      // Capture the sequence number and text at save-start time
+      const thisSequence = ++saveSequenceRef.current;
+      const textToSave = text.trim();
 
-    setSaveStatus("saving");
-    setSaveError("");
+      setSaveStatus("saving");
+      setSaveError("");
 
-    try {
-      // Attempt save with automatic retry (3 attempts with exponential backoff)
-      await retryWithBackoff(
-        async () => {
-          const response = await fetch(`/api/notes/${noteId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: textToSave }),
-          });
+      try {
+        // Attempt save with automatic retry (3 attempts with exponential backoff)
+        await retryWithBackoff(
+          async () => {
+            const response = await fetch(`/api/notes/${noteId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: textToSave }),
+            });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || "Failed to update note");
-          }
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || "Failed to update note");
+            }
 
-          return response.json();
-        },
-        {
-          maxAttempts: 3,
-          onRetry: (attempt, error) => {
-            console.log(
-              `Retry attempt ${attempt} for note ${noteId}:`,
-              error.message,
-            );
-            setSaveStatus("retrying");
+            return response.json();
           },
-        },
-      );
+          {
+            maxAttempts: 3,
+            onRetry: (attempt, error) => {
+              console.log(
+                `Retry attempt ${attempt} for note ${noteId}:`,
+                error.message,
+              );
+              setSaveStatus("retrying");
+            },
+          },
+        );
 
-      // Success! But only update status if this is still the latest save
-      // (a newer save may have started while this one was in flight)
-      if (thisSequence === saveSequenceRef.current) {
-        setSaveStatus("saved");
-        setHasChanges(false);
+        // Success! But only update status if this is still the latest save
+        // (a newer save may have started while this one was in flight)
+        if (thisSequence === saveSequenceRef.current) {
+          setSaveStatus("saved");
+          setHasChanges(false);
+        }
+
+        // Invalidate list/sidebar queries always
+        queryClient.invalidateQueries({ queryKey: ["notes"] });
+        queryClient.invalidateQueries({ queryKey: ["note-counts"] });
+
+        // For final saves (on close), also invalidate this note's cache
+        // so it's fresh on next open. During continuous autosave, DON'T
+        // invalidate to prevent the race condition with live typing.
+        if (isFinalSave) {
+          queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+        }
+      } catch (error) {
+        // All retries failed - add to pending queue for background retry
+        console.error("Failed to save note after retries:", error);
+        setSaveStatus("failed");
+        setSaveError(error instanceof Error ? error.message : "Unknown error");
+
+        // Add to pending saves (will be retried when network returns)
+        // Note: For edits, we need to ensure the note object has the required fields
+        if (note) {
+          pendingSavesManager.addPending({
+            id: noteId,
+            text: text.trim(),
+            type: note.type,
+            meetingId: note.meeting_id || undefined,
+            topicId: note.topic_id || undefined,
+            isUnsorted: note.is_unsorted,
+            timestamp: Date.now(),
+            attemptCount: 3,
+          });
+        }
+
+        // Don't block the user - status indicator shows the issue
       }
-
-      // Invalidate list/sidebar queries only - NEVER refetch the current note
-      // The local editor state is the source of truth, not the server
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      queryClient.invalidateQueries({ queryKey: ["note-counts"] });
-    } catch (error) {
-      // All retries failed - add to pending queue for background retry
-      console.error("Failed to save note after retries:", error);
-      setSaveStatus("failed");
-      setSaveError(error instanceof Error ? error.message : "Unknown error");
-
-      // Add to pending saves (will be retried when network returns)
-      // Note: For edits, we need to ensure the note object has the required fields
-      if (note) {
-        pendingSavesManager.addPending({
-          id: noteId,
-          text: text.trim(),
-          type: note.type,
-          meetingId: note.meeting_id || undefined,
-          topicId: note.topic_id || undefined,
-          isUnsorted: note.is_unsorted,
-          timestamp: Date.now(),
-          attemptCount: 3,
-        });
-      }
-
-      // Don't block the user - status indicator shows the issue
-    }
-  }, [hasChanges, text, noteId, note, queryClient]);
+    },
+    [hasChanges, text, noteId, note, queryClient],
+  );
 
   // Handle close button
   const handleClose = useCallback(async () => {
+    isClosingRef.current = true;
     if (hasChanges) {
-      await handleSave();
+      await handleSave(true); // Final save - invalidate cache
     }
+    // Always invalidate cache on close, even if no pending changes
+    // This ensures fresh data when note is reopened
+    queryClient.invalidateQueries({ queryKey: ["note", noteId] });
     router.back();
-  }, [hasChanges, handleSave, router]);
+  }, [hasChanges, handleSave, router, queryClient, noteId]);
 
   // Handle categorization from the categorize bar
   const handleCategorize = async (data: {
@@ -283,14 +298,56 @@ export default function NotePage() {
 
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        await handleSave();
+        isClosingRef.current = true;
+        await handleSave(true); // Final save - invalidate cache
+        // Always invalidate cache on close, even if no pending changes
+        queryClient.invalidateQueries({ queryKey: ["note", noteId] });
         router.back();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, router, showCategorize]);
+  }, [handleSave, router, showCategorize, queryClient, noteId]);
+
+  // Flush any pending save when component unmounts (e.g. navigation via sidebar)
+  // This ensures edits aren't lost if user navigates away without using ESC/close button
+  useEffect(() => {
+    return () => {
+      // Only trigger save on unmount if:
+      // 1. There are unsaved changes
+      // 2. We're not already in the middle of a close operation (which handles save)
+      // 3. Component is unmounting due to navigation, not due to intentional close
+      if (hasChanges && !isClosingRef.current && text.trim()) {
+        // Use the pending saves mechanism for reliable background save
+        // We can't await here (component is unmounting), but pending saves
+        // will retry until successful
+        if (note) {
+          const textToSave = text.trim();
+          pendingSavesManager.addPending({
+            id: noteId,
+            text: textToSave,
+            type: note.type,
+            meetingId: note.meeting_id || undefined,
+            topicId: note.topic_id || undefined,
+            isUnsorted: note.is_unsorted,
+            timestamp: Date.now(),
+            attemptCount: 0, // Will be retried from 0
+          });
+
+          // Also try an immediate fire-and-forget save
+          fetch(`/api/notes/${noteId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: textToSave }),
+            keepalive: true, // Ensure request completes even if page unloads
+          }).catch(() => {
+            // Silently fail - pending save will retry
+          });
+        }
+      }
+    };
+  }, [hasChanges, text, noteId, note]);
 
   // Warn before leaving when there are unsaved changes
   useEffect(() => {

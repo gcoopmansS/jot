@@ -5,6 +5,9 @@ import { useEditor, EditorContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import BubbleMenuExtension from "@tiptap/extension-bubble-menu";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import Link from "@tiptap/extension-link";
 import { Markdown } from "tiptap-markdown";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion, { SuggestionOptions } from "@tiptap/suggestion";
@@ -71,7 +74,7 @@ function getMarkdownFromEditor(editor: Editor): string {
 }
 
 // Slash command items - formatting options available via "/"
-const getSlashCommandItems = (editor: Editor): SlashCommandItem[] => [
+const getSlashCommandItems = (): SlashCommandItem[] => [
   {
     title: "Heading 1",
     icon: "H1",
@@ -105,6 +108,13 @@ const getSlashCommandItems = (editor: Editor): SlashCommandItem[] => [
     icon: "1.",
     command: (editor) => {
       editor.chain().focus().toggleOrderedList().run();
+    },
+  },
+  {
+    title: "Task List",
+    icon: "☐",
+    command: (editor) => {
+      editor.chain().focus().toggleTaskList().run();
     },
   },
   {
@@ -210,6 +220,22 @@ export function RichTextEditor({
             levels: [1, 2, 3],
           },
         }),
+        // Task list extensions for checkboxes
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        }),
+        // Link extension with autolink support
+        Link.configure({
+          openOnClick: false, // Use Cmd+click in edit mode
+          autolink: true, // Automatically linkify URLs
+          linkOnPaste: true, // Convert pasted URLs to links
+          HTMLAttributes: {
+            target: "_blank", // Open in new tab
+            rel: "noopener noreferrer",
+            class: "editor-link",
+          },
+        }),
         // Markdown extension for serialization/deserialization
         Markdown.configure({
           html: false, // Don't allow HTML
@@ -229,7 +255,7 @@ export function RichTextEditor({
         SlashCommand.configure({
           suggestion: {
             items: ({ query, editor }: { query: string; editor: Editor }) => {
-              const allItems = getSlashCommandItems(editor);
+              const allItems = getSlashCommandItems();
               return allItems.filter((item) =>
                 item.title.toLowerCase().startsWith(query.toLowerCase()),
               );
@@ -490,6 +516,54 @@ export function RichTextEditor({
 
         .rich-text-editor .ProseMirror li p {
           margin-bottom: 4px;
+        }
+
+        /* Task list / checkboxes */
+        .rich-text-editor .ProseMirror ul[data-type="taskList"] {
+          list-style-type: none;
+          margin-left: 0;
+          padding-left: 0;
+        }
+
+        .rich-text-editor .ProseMirror ul[data-type="taskList"] li {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 6px;
+          padding-left: 0;
+        }
+
+        .rich-text-editor .ProseMirror ul[data-type="taskList"] li > label {
+          flex: 0 0 auto;
+          margin-right: 0;
+          user-select: none;
+          margin-top: 2px;
+        }
+
+        .rich-text-editor .ProseMirror ul[data-type="taskList"] li > div {
+          flex: 1;
+        }
+
+        .rich-text-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+          margin: 0;
+          accent-color: var(--accent);
+        }
+
+        /* Links */
+        .rich-text-editor .ProseMirror a,
+        .rich-text-editor .ProseMirror a.editor-link {
+          color: var(--accent);
+          text-decoration: underline;
+          cursor: pointer;
+          transition: color 0.15s;
+        }
+
+        .rich-text-editor .ProseMirror a:hover,
+        .rich-text-editor .ProseMirror a.editor-link:hover {
+          color: var(--ink);
         }
 
         /* Blockquotes */
