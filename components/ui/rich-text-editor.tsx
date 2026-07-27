@@ -544,7 +544,10 @@ export function RichTextEditor({
           flex: 1;
         }
 
-        .rich-text-editor .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+        .rich-text-editor
+          .ProseMirror
+          ul[data-type="taskList"]
+          input[type="checkbox"] {
           width: 16px;
           height: 16px;
           cursor: pointer;
