@@ -58,12 +58,18 @@ export function Sidebar() {
     null,
   );
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  // Start with sidebar closed on mobile, open on desktop
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
-    // Default to true for SSR, will be corrected on mount
-    if (typeof window === "undefined") return true;
-    return window.innerWidth >= 768; // md breakpoint
-  });
+  // Always start "open" so the server render and the client's first render
+  // match exactly (the server has no window to check viewport width against,
+  // which was causing a hydration mismatch). Corrected to the real viewport
+  // width right after mount, below.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Close the sidebar on mount if we're actually on a narrow/mobile viewport.
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
 
   // Adjust sidebar state when window is resized across the md breakpoint
   useEffect(() => {
