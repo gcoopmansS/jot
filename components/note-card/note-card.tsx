@@ -69,6 +69,63 @@ function cleanMarkdownLine(rawLine: string): string {
   return line.replace(/\s+/g, " ").trim();
 }
 
+/** A markdown table row: starts and ends with "|" and has at least one cell. */
+function isTableRowLine(line: string): boolean {
+  return /^\|.+\|$/.test(line);
+}
+
+function splitTableCells(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+/** The "| --- | :--: |" delimiter row that follows a table's header row. */
+function isTableDelimiterRow(line: string): boolean {
+  const cells = splitTableCells(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/.test(cell));
+}
+
+/**
+ * Card previews intentionally don't render the actual table grid (too
+ * cramped, and truncation would leave broken-looking cut-off rows) - instead
+ * collapse a whole table block into one inline "Table, RxC" summary line,
+ * consistent with how images will eventually be indicated once built.
+ */
+function collapseTableBlocks(lines: string[]): string[] {
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const headerLine = lines[i];
+    const delimiterLine = lines[i + 1];
+
+    if (
+      isTableRowLine(headerLine) &&
+      delimiterLine !== undefined &&
+      isTableRowLine(delimiterLine) &&
+      isTableDelimiterRow(delimiterLine)
+    ) {
+      const cols = splitTableCells(headerLine).length;
+      let rows = 1; // header row
+      let j = i + 2;
+      while (j < lines.length && isTableRowLine(lines[j])) {
+        rows++;
+        j++;
+      }
+      result.push(`▦ Table, ${rows}×${cols}`);
+      i = j;
+    } else {
+      result.push(headerLine);
+      i++;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Build a card preview snippet that preserves real line breaks between
  * blocks (paragraphs/list items) instead of flattening everything into one
@@ -76,7 +133,7 @@ function cleanMarkdownLine(rawLine: string): string {
  * that is left to the CSS line-clamp on the snippet element.
  */
 function buildSnippet(lines: string[], maxLines: number): string {
-  return lines
+  return collapseTableBlocks(lines)
     .map(cleanMarkdownLine)
     .filter((line) => line.length > 0)
     .slice(0, maxLines)

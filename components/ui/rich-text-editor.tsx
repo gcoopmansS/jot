@@ -8,12 +8,13 @@ import BubbleMenuExtension from "@tiptap/extension-bubble-menu";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
+import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { Markdown } from "tiptap-markdown";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion, { SuggestionOptions } from "@tiptap/suggestion";
 import { Extension } from "@tiptap/core";
 import tippy, { Instance as TippyInstance } from "tippy.js";
-import { CheckSquare } from "lucide-react";
+import { CheckSquare, Table as TableIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   SlashCommandMenu,
@@ -21,6 +22,7 @@ import {
   SlashCommandMenuRef,
 } from "./slash-command-menu";
 import { BubbleMenuToolbar } from "./bubble-menu-toolbar";
+import { TableControls } from "./table-controls";
 
 /**
  * RichTextEditor - Tiptap-based markdown editor for note capture and editing.
@@ -132,6 +134,19 @@ const getSlashCommandItems = (): SlashCommandItem[] => [
       editor.chain().focus().toggleCodeBlock().run();
     },
   },
+  {
+    title: "Table",
+    icon: <TableIcon className="h-4 w-4" strokeWidth={2} />,
+    command: (editor) => {
+      // withHeaderRow keeps the table serializable as plain GFM markdown
+      // (pipe syntax) rather than falling back to raw HTML in storage.
+      editor
+        .chain()
+        .focus()
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run();
+    },
+  },
 ];
 
 // Create the slash command extension using Tiptap's suggestion utility
@@ -226,6 +241,17 @@ export function RichTextEditor({
         TaskItem.configure({
           nested: true,
         }),
+        // Table extensions - basic (no column resizing). renderWrapper
+        // wraps the table in a div.tableWrapper so narrow-width notes can
+        // scroll the table horizontally instead of forcing the page to
+        // reflow (styled below).
+        Table.configure({
+          resizable: false,
+          renderWrapper: true,
+        }),
+        TableRow,
+        TableHeader,
+        TableCell,
         // Link extension with autolink support
         Link.configure({
           openOnClick: false, // Use Cmd+click in edit mode
@@ -415,6 +441,7 @@ export function RichTextEditor({
   return (
     <div ref={editorContainerRef} className={cn("rich-text-editor", className)}>
       {editor && <BubbleMenuToolbar editor={editor} />}
+      {editor && <TableControls editor={editor} />}
       <EditorContent editor={editor} />
       <style jsx global>{`
         /* Rich text editor styles - match the design language */
@@ -609,6 +636,39 @@ export function RichTextEditor({
           padding: 0;
           border: none;
           font-size: inherit;
+        }
+
+        /* Tables - the wrapper scrolls horizontally on narrow widths rather
+           than forcing the whole page to reflow */
+        .rich-text-editor .ProseMirror .tableWrapper {
+          margin-top: 12px;
+          margin-bottom: 12px;
+          overflow-x: auto;
+        }
+
+        .rich-text-editor .ProseMirror table {
+          border-collapse: collapse;
+          width: 100%;
+          table-layout: fixed;
+        }
+
+        .rich-text-editor .ProseMirror th,
+        .rich-text-editor .ProseMirror td {
+          border: 1px solid var(--line);
+          padding: 6px 10px;
+          text-align: left;
+          vertical-align: top;
+          min-width: 80px;
+        }
+
+        .rich-text-editor .ProseMirror th {
+          background-color: var(--paper);
+          font-weight: 600;
+        }
+
+        .rich-text-editor .ProseMirror td p,
+        .rich-text-editor .ProseMirror th p {
+          margin: 0;
         }
 
         /* Horizontal rule */
