@@ -13,37 +13,74 @@ import { motion } from "framer-motion";
 import { useCurrentUser } from "@/lib/use-current-user";
 
 /**
- * Strip markdown formatting characters from text for clean previews.
- * Converts: **bold** → bold, *italic* → italic, # Heading → Heading, etc.
+ * Decode the handful of HTML entities that can end up literally in note text
+ * (e.g. "&gt;" instead of ">"). Order matters: decode "&amp;" last so a
+ * double-encoded entity like "&amp;lt;" doesn't get mangled.
  */
-function stripMarkdown(text: string): string {
-  return (
-    text
-      // Remove headings (# ## ###)
-      .replace(/^#{1,6}\s+/gm, "")
-      // Remove bold (**text** or __text__)
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/__(.+?)__/g, "$1")
-      // Remove italic (*text* or _text_)
-      .replace(/\*(.+?)\*/g, "$1")
-      .replace(/_(.+?)_/g, "$1")
-      // Remove inline code (`code`)
-      .replace(/`(.+?)`/g, "$1")
-      // Remove links [text](url) → text
-      .replace(/\[(.+?)\]\(.+?\)/g, "$1")
-      // Remove blockquote markers (>)
-      .replace(/^>\s+/gm, "")
-      // Remove task list markers (- [ ] and - [x])
-      .replace(/^[\s]*-\s*\[[x\s]\]\s+/gim, "")
-      // Remove list markers (-, *, +, 1.)
-      .replace(/^[\s]*[-*+]\s+/gm, "")
-      .replace(/^[\s]*\d+\.\s+/gm, "")
-      // Remove horizontal rules (---, ***, ___)
-      .replace(/^[-*_]{3,}$/gm, "")
-      // Clean up multiple spaces
-      .replace(/\s+/g, " ")
-      .trim()
-  );
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * Clean a single markdown line for preview display: decode entities, turn
+ * list/checkbox markers into plain display symbols, and strip inline
+ * formatting characters. Must run per-line (not on a pre-joined block of
+ * text) since the list/heading/blockquote markers are only ever at the
+ * start of their own line.
+ */
+function cleanMarkdownLine(rawLine: string): string {
+  let line = decodeHtmlEntities(rawLine);
+
+  // Heading marker
+  line = line.replace(/^#{1,6}\s+/, "");
+
+  // Task list marker → plain checkbox symbol (non-interactive in previews)
+  const taskMatch = line.match(/^[-*+]\s*\[([ xX])\]\s+(.*)$/);
+  if (taskMatch) {
+    const checked = taskMatch[1].toLowerCase() === "x";
+    line = `${checked ? "☑" : "☐"} ${taskMatch[2]}`;
+  } else {
+    // Bullet list marker → plain bullet symbol (ordered list numbers are
+    // left as-is, e.g. "1. ", since they already read fine on their own)
+    line = line.replace(/^[-*+]\s+/, "• ");
+  }
+
+  // Blockquote marker (no border styling in previews, just plain text)
+  line = line.replace(/^>\s+/, "");
+
+  // Inline formatting
+  line = line
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/_(.+?)_/g, "$1")
+    .replace(/`(.+?)`/g, "$1")
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1");
+
+  // Horizontal rule → drop the line entirely
+  if (/^[-*_]{3,}$/.test(line.trim())) return "";
+
+  return line.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Build a card preview snippet that preserves real line breaks between
+ * blocks (paragraphs/list items) instead of flattening everything into one
+ * run-on sentence. Caps at maxLines blocks; visual truncation within/beyond
+ * that is left to the CSS line-clamp on the snippet element.
+ */
+function buildSnippet(lines: string[], maxLines: number): string {
+  return lines
+    .map(cleanMarkdownLine)
+    .filter((line) => line.length > 0)
+    .slice(0, maxLines)
+    .join("\n");
 }
 
 /**
@@ -169,7 +206,7 @@ export function NoteCard({
     const nonEmptyLines = lines.filter((line) => line.length > 0);
 
     if (nonEmptyLines.length === 0) {
-      return { hasTitle: false, snippet: "", needsEllipsis: false };
+      return { hasTitle: false, snippet: "" };
     }
 
     // Check if first non-empty line is a markdown heading
@@ -185,78 +222,32 @@ export function NoteCard({
         bodyLines = nonEmptyLines.slice(1);
       }
 
-      // Combine remaining lines and strip markdown for snippet
-      const bodyText = bodyLines.join(" ");
-      const cleanText = stripMarkdown(bodyText);
-
-      if (!cleanText) {
-        // No body content after heading
-        return {
-          hasTitle: true,
-          title: note.title,
-          snippet: "",
-          needsEllipsis: false,
-        };
-      }
-
-      const snippet = cleanText.slice(0, 80);
-      const cutAtWordBoundary =
-        snippet.length < cleanText.length
-          ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
-          : snippet;
+      const snippet = buildSnippet(bodyLines, 2);
 
       return {
         hasTitle: true,
         title: note.title,
-        snippet: cutAtWordBoundary,
-        needsEllipsis: cleanText.length > 80,
+        snippet,
       };
     } else if (headingMatch) {
       // No explicit title, but content starts with heading: treat heading as title
       const extractedTitle = headingMatch[2]; // Heading text without # markers
       const bodyLines = nonEmptyLines.slice(1); // Content after the heading
 
-      // Generate snippet from content that follows the heading
-      const bodyText = bodyLines.join(" ");
-      const cleanText = stripMarkdown(bodyText);
-
-      if (!cleanText) {
-        // Heading only, no content after it
-        return {
-          hasTitle: true,
-          title: extractedTitle,
-          snippet: "",
-          needsEllipsis: false,
-        };
-      }
-
-      const snippet = cleanText.slice(0, 80);
-      const cutAtWordBoundary =
-        snippet.length < cleanText.length
-          ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
-          : snippet;
+      const snippet = buildSnippet(bodyLines, 2);
 
       return {
         hasTitle: true,
         title: extractedTitle,
-        snippet: cutAtWordBoundary,
-        needsEllipsis: cleanText.length > 80,
+        snippet,
       };
     } else {
       // No title, no leading heading: show entire content as snippet
-      const fullText = nonEmptyLines.join(" ");
-      const cleanText = stripMarkdown(fullText);
-
-      const snippet = cleanText.slice(0, 150);
-      const cutAtWordBoundary =
-        snippet.length < cleanText.length
-          ? snippet.slice(0, snippet.lastIndexOf(" ")) || snippet
-          : snippet;
+      const snippet = buildSnippet(nonEmptyLines, 3);
 
       return {
         hasTitle: false,
-        snippet: cutAtWordBoundary,
-        needsEllipsis: cleanText.length > 150,
+        snippet,
       };
     }
   };
@@ -416,15 +407,18 @@ export function NoteCard({
             {preview.title}
           </h3>
         )}
-        {/* Snippet - always shown, properly truncated to 2 lines */}
+        {/* Snippet - preserves real line breaks between blocks (paragraphs/
+            list items) rather than flattening them into a run-on sentence;
+            visually clamped and auto-ellipsized by line-clamp beyond that. */}
         {preview.snippet && (
           <p
             className="text-base leading-relaxed"
             style={{
               fontFamily: "var(--font-source-serif)",
               color: preview.hasTitle ? "var(--ink-soft)" : "var(--ink)",
+              whiteSpace: "pre-line",
               display: "-webkit-box",
-              WebkitLineClamp: 2,
+              WebkitLineClamp: preview.hasTitle ? 2 : 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
               overflowWrap: "break-word",
