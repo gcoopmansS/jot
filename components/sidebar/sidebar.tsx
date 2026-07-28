@@ -16,6 +16,7 @@ import {
   MoreVertical,
   Pencil,
   Trash2,
+  ChevronRight,
 } from "lucide-react";
 import type { Project, Meeting, NoteTopic } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -610,24 +611,25 @@ export function Sidebar() {
                       />
                     ) : (
                       <div className="group relative">
-                        <div className="flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm text-[var(--ink)] transition-colors group-hover:bg-[var(--accent-soft)]">
-                          <Collapsible.Trigger asChild>
-                            <button
-                              className="text-xs text-[var(--ink-soft)] cursor-pointer hover:text-[var(--ink)] transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {isExpanded ? "▼" : "▶"}
-                            </button>
-                          </Collapsible.Trigger>
-                          <Link
-                            href={`/projects/${project.id}`}
-                            className="flex-1 text-left cursor-pointer truncate"
-                            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
-                            onClick={() => setIsSidebarOpen(false)}
+                        <Collapsible.Trigger asChild>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] cursor-pointer text-left"
                           >
-                            {project.name}
-                          </Link>
-                        </div>
+                            <ChevronRight
+                              className={cn(
+                                "h-3.5 w-3.5 flex-shrink-0 text-[var(--ink-soft)] transition-transform",
+                                isExpanded && "rotate-90",
+                              )}
+                            />
+                            <span
+                              className="flex-1 truncate"
+                              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                            >
+                              {project.name}
+                            </span>
+                          </button>
+                        </Collapsible.Trigger>
 
                         <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
                           <DropdownMenu.Root

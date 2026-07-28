@@ -212,11 +212,12 @@ export function NoteCard({
       queryClient.invalidateQueries({ queryKey: ["topics", currentUser?.id] });
       setShowDeleteDialog(false);
 
-      // Check if we need to redirect due to automatic cleanup
+      // If auto-cleanup deleted the meeting/topic we're currently viewing,
+      // that page is gone - redirect to "Recent" (there's no project overview
+      // page to fall back to instead; it always exists and is always valid).
       if (data.cleanup) {
         const { deletedMeetingId, deletedTopicId } = data.cleanup;
 
-        // Parse current path to check if we're viewing the deleted container
         const meetingMatch = pathname?.match(
           /\/projects\/([^/]+)\/meetings\/([^/]+)/,
         );
@@ -224,21 +225,13 @@ export function NoteCard({
           /\/projects\/([^/]+)\/topics\/([^/]+)/,
         );
 
-        let shouldRedirect = false;
-        let redirectPath = "/everything"; // Default fallback
+        const viewingDeletedMeeting =
+          deletedMeetingId && meetingMatch?.[2] === deletedMeetingId;
+        const viewingDeletedTopic =
+          deletedTopicId && topicMatch?.[2] === deletedTopicId;
 
-        if (deletedMeetingId && meetingMatch?.[2] === deletedMeetingId) {
-          // We're viewing the meeting that just got deleted - redirect to parent project
-          shouldRedirect = true;
-          redirectPath = `/projects/${meetingMatch[1]}`;
-        } else if (deletedTopicId && topicMatch?.[2] === deletedTopicId) {
-          // We're viewing the topic that just got deleted - redirect to parent project
-          shouldRedirect = true;
-          redirectPath = `/projects/${topicMatch[1]}`;
-        }
-
-        if (shouldRedirect) {
-          router.push(redirectPath);
+        if (viewingDeletedMeeting || viewingDeletedTopic) {
+          router.push("/everything");
         }
       }
     },
