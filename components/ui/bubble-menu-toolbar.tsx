@@ -1,7 +1,7 @@
 "use client";
 
 import { BubbleMenu } from "@tiptap/react/menus";
-import { Editor } from "@tiptap/react";
+import { Editor, useEditorState } from "@tiptap/react";
 import {
   Bold,
   Italic,
@@ -24,54 +24,70 @@ interface BubbleMenuToolbarProps {
 }
 
 export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
+  // Re-reads active formatting from the editor on every transaction (selection
+  // moves, typing, etc.) so the toolbar highlight never goes stale while open.
+  const activeStates = useEditorState({
+    editor,
+    selector: (ctx) => ({
+      bold: ctx.editor.isActive("bold"),
+      italic: ctx.editor.isActive("italic"),
+      heading1: ctx.editor.isActive("heading", { level: 1 }),
+      heading2: ctx.editor.isActive("heading", { level: 2 }),
+      heading3: ctx.editor.isActive("heading", { level: 3 }),
+      bulletList: ctx.editor.isActive("bulletList"),
+      taskList: ctx.editor.isActive("taskList"),
+      blockquote: ctx.editor.isActive("blockquote"),
+    }),
+  });
+
   const buttons = [
     {
       icon: Bold,
       title: "Bold",
       action: () => editor.chain().focus().toggleBold().run(),
-      isActive: () => editor.isActive("bold"),
+      isActive: activeStates.bold,
     },
     {
       icon: Italic,
       title: "Italic",
       action: () => editor.chain().focus().toggleItalic().run(),
-      isActive: () => editor.isActive("italic"),
+      isActive: activeStates.italic,
     },
     {
       icon: Heading1,
       title: "Heading 1",
       action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-      isActive: () => editor.isActive("heading", { level: 1 }),
+      isActive: activeStates.heading1,
     },
     {
       icon: Heading2,
       title: "Heading 2",
       action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-      isActive: () => editor.isActive("heading", { level: 2 }),
+      isActive: activeStates.heading2,
     },
     {
       icon: Heading3,
       title: "Heading 3",
       action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-      isActive: () => editor.isActive("heading", { level: 3 }),
+      isActive: activeStates.heading3,
     },
     {
       icon: List,
       title: "Bullet List",
       action: () => editor.chain().focus().toggleBulletList().run(),
-      isActive: () => editor.isActive("bulletList"),
+      isActive: activeStates.bulletList,
     },
     {
       icon: CheckSquare,
       title: "Checkbox",
       action: () => editor.chain().focus().toggleTaskList().run(),
-      isActive: () => editor.isActive("taskList"),
+      isActive: activeStates.taskList,
     },
     {
       icon: Quote,
       title: "Quote",
       action: () => editor.chain().focus().toggleBlockquote().run(),
-      isActive: () => editor.isActive("blockquote"),
+      isActive: activeStates.blockquote,
     },
   ];
 
@@ -91,7 +107,7 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
       >
         {buttons.map((button, index) => {
           const Icon = button.icon;
-          const isActive = button.isActive();
+          const isActive = button.isActive;
 
           return (
             <button
