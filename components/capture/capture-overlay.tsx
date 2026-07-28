@@ -109,6 +109,7 @@ export function CaptureOverlay() {
       pendingSavesManager.addPending({
         id: noteId,
         text: textToSave,
+        title: title || undefined,
         type: prefilledContext.type,
         meetingId: prefilledContext.meetingId,
         topicId: prefilledContext.topicId,
@@ -207,13 +208,21 @@ export function CaptureOverlay() {
 
   // Extract the finish logic so it can be called from both keyboard shortcut and button
   const handleFinish = useCallback(() => {
+    // Nothing to save with an empty note - close the same way Discard does,
+    // rather than showing the categorize bar for a note that can't be saved
+    // (the DB requires body text; a title alone isn't a savable note).
+    if (!text.trim()) {
+      closeCapture();
+      return;
+    }
+
     // If we have prefilled context, save directly without showing categorize bar
     if (prefilledContext) {
       handleSaveWithContext();
     } else {
       setShowCategorize(true);
     }
-  }, [prefilledContext, handleSaveWithContext]);
+  }, [text, prefilledContext, handleSaveWithContext, closeCapture]);
 
   // Focus textarea when overlay opens or when returning from categorize bar
   useEffect(() => {
@@ -386,6 +395,7 @@ export function CaptureOverlay() {
       pendingSavesManager.addPending({
         id: noteId,
         text: textToSave,
+        title: data.title || undefined,
         type: data.type, // Keep the type the user selected
         meetingId: shouldBeUnsorted ? undefined : data.meetingId,
         topicId: shouldBeUnsorted ? undefined : data.topicId,
@@ -419,6 +429,7 @@ export function CaptureOverlay() {
             body: JSON.stringify({
               id: noteId,
               text: text.trim(),
+              title: title || null,
               type: "general",
               is_unsorted: true,
             }),
@@ -461,6 +472,7 @@ export function CaptureOverlay() {
       pendingSavesManager.addPending({
         id: noteId,
         text: textToSave,
+        title: title || undefined,
         type: "general",
         isUnsorted: true,
         timestamp: Date.now(),
@@ -498,7 +510,8 @@ export function CaptureOverlay() {
                         e.stopPropagation();
                         handleFinish();
                       }}
-                      className="px-4 py-2.5 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium text-sm transition-colors hover:bg-[var(--accent)] min-h-[44px] flex items-center"
+                      disabled={!text.trim()}
+                      className="px-4 py-2.5 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium text-sm transition-colors hover:bg-[var(--accent)] min-h-[44px] flex items-center disabled:opacity-40 disabled:hover:bg-[var(--ink)] disabled:cursor-not-allowed"
                       style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                     >
                       Done

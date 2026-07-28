@@ -13,6 +13,7 @@ const PENDING_SAVES_KEY = "jot-pending-saves";
 export interface PendingSave {
   id: string; // Client-generated UUID
   text: string;
+  title?: string;
   type: "meeting" | "general";
   meetingId?: string;
   topicId?: string;
@@ -178,6 +179,7 @@ class PendingSavesManager {
       body: JSON.stringify({
         id: save.id,
         text: save.text,
+        title: save.title || null,
         type: save.type,
         meeting_id: save.meetingId || null,
         topic_id: save.topicId || null,

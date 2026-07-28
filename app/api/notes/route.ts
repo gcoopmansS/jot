@@ -60,16 +60,22 @@ export async function POST(request: NextRequest) {
       body.is_unsorted !== undefined ? body.is_unsorted : !hasCategorization;
 
     // Prepare the note data
-    const noteData = {
+    const noteData: Record<string, unknown> = {
       ...(body.id && { id: body.id }), // Include client ID if provided
       user_id: user.id,
       text: body.text,
-      title: body.title || null,
       type: body.type,
       meeting_id: body.meeting_id || null,
       topic_id: body.topic_id || null,
       is_unsorted: isUnsorted,
     };
+
+    // Only touch title if the caller actually sent one. This is an upsert, so a
+    // retried/background-queued POST that omits title (a bug in itself - every
+    // caller should send it) must not silently null out an already-saved title.
+    if (body.title !== undefined) {
+      noteData.title = body.title || null;
+    }
 
     // Use upsert to handle retries gracefully
     // If a note with this ID already exists, it will be updated (idempotent)
