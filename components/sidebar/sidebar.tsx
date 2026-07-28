@@ -314,7 +314,10 @@ export function Sidebar() {
         queryClient.invalidateQueries({
           queryKey: ["topics", currentUser?.id],
         });
-        queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
+        // Bare "notes" prefix so this also catches the Unsorted/Meeting/Topic
+        // list queries (["notes", "unsorted", ...] etc.), which don't share
+        // a prefix with ["notes", currentUser?.id].
+        queryClient.invalidateQueries({ queryKey: ["notes"] });
         queryClient.invalidateQueries({
           queryKey: ["note-counts", currentUser?.id],
         });

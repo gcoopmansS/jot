@@ -137,17 +137,14 @@ export function NoteCard({
         deletedTopicId: string | null;
       };
     }) => {
-      // Invalidate queries immediately - AnimatePresence will handle the exit animation
-      queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
-      queryClient.invalidateQueries({
-        queryKey: ["unsorted-notes", currentUser?.id],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["meeting-notes", currentUser?.id],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["topic-notes", currentUser?.id],
-      });
+      // Invalidate queries immediately - AnimatePresence will handle the exit animation.
+      // Bare "notes" prefix (not ["notes", currentUser?.id]) so this also
+      // catches the Unsorted/Meeting/Topic list queries, which key on
+      // ["notes", "unsorted", ...] / ["notes", "meeting", meetingId, ...] /
+      // ["notes", "topic", topicId, ...] and don't share a prefix with
+      // ["notes", currentUser?.id]. (The previous "unsorted-notes" /
+      // "meeting-notes" / "topic-notes" keys here never matched anything.)
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({
         queryKey: ["note-counts", currentUser?.id],
       });

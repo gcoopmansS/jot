@@ -85,9 +85,7 @@ export default function NotePage() {
         // If background retry succeeded, refresh the sidebar/list queries only
         // NEVER refetch the current note - local editor state is the source of truth
         if (status.state === "saved") {
-          queryClient.invalidateQueries({
-            queryKey: ["notes", currentUser?.id],
-          });
+          queryClient.invalidateQueries({ queryKey: ["notes"] });
           queryClient.invalidateQueries({
             queryKey: ["note-counts", currentUser?.id],
           });
@@ -172,8 +170,14 @@ export default function NotePage() {
           setHasChanges(false);
         }
 
-        // Invalidate list/sidebar queries always
-        queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
+        // Invalidate list/sidebar queries always. Use the bare "notes" prefix
+        // (not ["notes", currentUser?.id]) so this also catches the more
+        // specific list queries used by the Unsorted/Meeting/Topic pages
+        // (["notes", "unsorted", ...], ["notes", "meeting", meetingId, ...],
+        // etc.) - those don't share a prefix with ["notes", currentUser?.id],
+        // so a narrower invalidation here left their cards stale until a
+        // manual refresh.
+        queryClient.invalidateQueries({ queryKey: ["notes"] });
         queryClient.invalidateQueries({
           queryKey: ["note-counts", currentUser?.id],
         });
@@ -198,6 +202,7 @@ export default function NotePage() {
           pendingSavesManager.addPending({
             id: noteId,
             text: text.trim(),
+            title: titleToSave || undefined,
             type: note.type,
             meetingId: note.meeting_id || undefined,
             topicId: note.topic_id || undefined,
@@ -259,8 +264,10 @@ export default function NotePage() {
         throw new Error("Failed to update note");
       }
 
-      // Invalidate all relevant queries
-      queryClient.invalidateQueries({ queryKey: ["notes", currentUser?.id] });
+      // Invalidate all relevant queries. Bare "notes" prefix so this also
+      // catches the Unsorted/Meeting/Topic list queries (see comment in
+      // handleSave above).
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note", noteId] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
 
@@ -338,9 +345,11 @@ export default function NotePage() {
         // will retry until successful
         if (note) {
           const textToSave = text.trim();
+          const titleToSave = title.trim() || undefined;
           pendingSavesManager.addPending({
             id: noteId,
             text: textToSave,
+            title: titleToSave,
             type: note.type,
             meetingId: note.meeting_id || undefined,
             topicId: note.topic_id || undefined,
@@ -353,7 +362,10 @@ export default function NotePage() {
           fetch(`/api/notes/${noteId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: textToSave }),
+            body: JSON.stringify({
+              text: textToSave,
+              title: titleToSave || null,
+            }),
             keepalive: true, // Ensure request completes even if page unloads
           }).catch(() => {
             // Silently fail - pending save will retry
@@ -361,7 +373,7 @@ export default function NotePage() {
         }
       }
     };
-  }, [hasChanges, text, noteId, note]);
+  }, [hasChanges, text, title, noteId, note]);
 
   // Warn before leaving when there are unsaved changes
   useEffect(() => {
