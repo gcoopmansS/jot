@@ -13,6 +13,7 @@ import { ReactRenderer } from "@tiptap/react";
 import Suggestion, { SuggestionOptions } from "@tiptap/suggestion";
 import { Extension } from "@tiptap/core";
 import tippy, { Instance as TippyInstance } from "tippy.js";
+import { CheckSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   SlashCommandMenu,
@@ -112,7 +113,7 @@ const getSlashCommandItems = (): SlashCommandItem[] => [
   },
   {
     title: "Task List",
-    icon: "☐",
+    icon: <CheckSquare className="h-4 w-4" strokeWidth={2} />,
     command: (editor) => {
       editor.chain().focus().toggleTaskList().run();
     },

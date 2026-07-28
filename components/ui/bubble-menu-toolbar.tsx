@@ -9,6 +9,7 @@ import {
   Heading2,
   Heading3,
   List,
+  CheckSquare,
   Quote,
 } from "lucide-react";
 
@@ -59,6 +60,12 @@ export function BubbleMenuToolbar({ editor }: BubbleMenuToolbarProps) {
       title: "Bullet List",
       action: () => editor.chain().focus().toggleBulletList().run(),
       isActive: () => editor.isActive("bulletList"),
+    },
+    {
+      icon: CheckSquare,
+      title: "Checkbox",
+      action: () => editor.chain().focus().toggleTaskList().run(),
+      isActive: () => editor.isActive("taskList"),
     },
     {
       icon: Quote,

@@ -1,6 +1,12 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import {
+  forwardRef,
+  ReactNode,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import { Editor } from "@tiptap/react";
 
 /**
@@ -12,7 +18,7 @@ import { Editor } from "@tiptap/react";
 export interface SlashCommandItem {
   title: string;
   description?: string;
-  icon?: string;
+  icon?: ReactNode;
   command: (editor: Editor) => void;
 }
 
