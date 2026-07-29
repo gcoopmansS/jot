@@ -304,7 +304,7 @@ export default function SettingsPage() {
       >
         Manage your account preferences and data
       </p>
-      <p className="mt-2">
+      <p className="mt-2 flex items-center gap-3">
         <a
           href="/privacy"
           target="_blank"
@@ -313,6 +313,15 @@ export default function SettingsPage() {
           style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
         >
           Privacy Policy
+        </a>
+        <a
+          href="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors underline"
+          style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+        >
+          Terms of Service
         </a>
       </p>
 

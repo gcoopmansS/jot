@@ -290,6 +290,16 @@ function AuthForm() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     Privacy Policy
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--accent)] underline hover:text-[var(--ink)] transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Terms of Service
                   </a>
                 </span>
               </label>
@@ -298,7 +308,8 @@ function AuthForm() {
                   className="mt-2 text-xs text-red-600"
                   style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                 >
-                  You must agree to the Privacy Policy to create an account
+                  You must agree to the Privacy Policy and Terms of Service to
+                  create an account
                 </p>
               )}
             </div>

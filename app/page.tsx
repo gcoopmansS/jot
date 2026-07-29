@@ -390,13 +390,22 @@ export default async function LandingPage() {
               >
                 Capture first, file later
               </p>
-              <Link
-                href="/privacy"
-                className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors underline mt-2 inline-block"
-                style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
-              >
-                Privacy Policy
-              </Link>
+              <div className="flex items-center gap-3 mt-2">
+                <Link
+                  href="/privacy"
+                  className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors underline"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  Privacy Policy
+                </Link>
+                <Link
+                  href="/terms"
+                  className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors underline"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  Terms of Service
+                </Link>
+              </div>
             </div>
             <Link
               href="/auth/sign-in?mode=sign-up"
