@@ -30,6 +30,13 @@ export async function GET(request: Request) {
       // Successfully confirmed - redirect to the intended destination
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
+
+    console.error("Auth callback: exchangeCodeForSession failed", error);
+  } else {
+    console.error(
+      "Auth callback: no 'code' param in URL, full URL was:",
+      requestUrl.toString(),
+    );
   }
 
   // If there was an error or no code, redirect to sign-in

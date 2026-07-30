@@ -206,13 +206,24 @@ function AuthForm() {
 
           {/* Password field */}
           <div className="mb-6">
-            <label
-              htmlFor="password"
-              className="block text-xs uppercase tracking-wide font-medium text-[var(--ink-soft)] mb-2"
-              style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
-            >
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor="password"
+                className="block text-xs uppercase tracking-wide font-medium text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-ibm-plex-mono)" }}
+              >
+                Password
+              </label>
+              {mode === "sign-in" && (
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs text-[var(--accent)] hover:underline"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                >
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <input
               id="password"
               type="password"
