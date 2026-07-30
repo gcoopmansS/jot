@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "./supabase";
 import { clearAllDrafts } from "./draft-storage";
 
@@ -37,6 +37,15 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       }),
   );
 
+  // Tracks whose data the cache currently holds, so a redundant SIGNED_IN
+  // event for the SAME already-active user doesn't wipe the cache. Supabase
+  // re-emits SIGNED_IN on things like tab focus/token refresh, not only on
+  // an actual fresh login - without this guard, every one of those events
+  // triggered a full queryClient.clear(), which could wipe in-flight queries
+  // faster than they could ever resolve (most visible as a permanently stuck
+  // "Loading..." after the tab had been asleep/backgrounded for a while).
+  const lastUserIdRef = useRef<string | null>(null);
+
   // CRITICAL SECURITY: Listen for auth state changes and clear everything
   // when the user signs out or switches accounts
   useEffect(() => {
@@ -45,21 +54,26 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      // On sign-out or when the user changes (different user ID)
       if (event === "SIGNED_OUT") {
         console.log(
           "[Security] User signed out - clearing all cached data and drafts",
         );
+        lastUserIdRef.current = null;
         // Clear ALL query cache to prevent data leakage
         queryClient.clear();
         // Clear ALL drafts from localStorage
         clearAllDrafts();
       } else if (event === "SIGNED_IN" && session?.user) {
-        // Also clear cache on sign-in to ensure fresh data
-        console.log(
-          "[Security] User signed in - clearing cache to ensure fresh data",
-        );
-        queryClient.clear();
+        // Only clear if this is actually a different user than the cache
+        // currently holds - covers both a fresh sign-in (previous: null)
+        // and switching accounts in the same tab (previous: a different id).
+        if (lastUserIdRef.current !== session.user.id) {
+          console.log(
+            "[Security] User signed in (new session) - clearing cache to ensure fresh data",
+          );
+          queryClient.clear();
+        }
+        lastUserIdRef.current = session.user.id;
       }
     });
 
