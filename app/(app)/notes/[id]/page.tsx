@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { X, Share, Copy, Download, Printer, Check } from "lucide-react";
 import { Note } from "@/lib/types";
 import { Kbd } from "@/components/ui/kbd";
 import { CategorizeBar } from "@/components/capture/categorize-bar";
@@ -40,6 +41,7 @@ export default function NotePage() {
     "idle" | "saving" | "saved" | "retrying" | "failed"
   >("idle");
   const [saveError, setSaveError] = useState<string>("");
+  const [justCopied, setJustCopied] = useState(false);
   const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const saveSequenceRef = useRef(0); // Track save sequence to prevent stale responses
@@ -302,6 +304,41 @@ export default function NotePage() {
     setShowCategorize(false);
   };
 
+  // Export/share actions - single note only, operating on the raw stored
+  // markdown text (no rendering needed for copy/download; the print view
+  // handles rendering separately).
+  const handleCopyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setJustCopied(true);
+      setTimeout(() => setJustCopied(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy note to clipboard:", error);
+    }
+  };
+
+  const handleDownloadMarkdown = () => {
+    const safeName =
+      title.trim().replace(/[\\/:*?"<>|]/g, "").trim() || "untitled-note";
+    const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeName}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = () => {
+    // No PDF library - just the browser's native print dialog, where the
+    // user picks "Save as PDF" themselves. Print CSS below (the
+    // "hide everything, reveal only .print-content" trick) takes care of
+    // hiding the editing chrome so only the note itself prints.
+    window.print();
+  };
+
   // Debounced autosave: save 1.5 seconds after user stops typing
   useEffect(() => {
     if (!hasChanges || !text.trim()) {
@@ -469,23 +506,92 @@ export default function NotePage() {
             </span>
           )}
         </div>
-        <button
-          onClick={handleClose}
-          className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)] cursor-pointer"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)] cursor-pointer"
+                aria-label="Export or share this note"
+              >
+                <Share className="h-4 w-4" />
+              </button>
+            </DropdownMenu.Trigger>
+
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="z-50 min-w-[200px] rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-1 shadow-[var(--shadow-pop)]"
+                sideOffset={5}
+                align="end"
+              >
+                <DropdownMenu.Item
+                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--ink)] outline-none transition-colors hover:bg-[var(--accent-soft)] focus:bg-[var(--accent-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                  onSelect={handleCopyMarkdown}
+                >
+                  {justCopied ? (
+                    <Check className="h-4 w-4 text-[var(--accent)]" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  {justCopied ? "Copied!" : "Copy as Markdown"}
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Item
+                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--ink)] outline-none transition-colors hover:bg-[var(--accent-soft)] focus:bg-[var(--accent-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                  onSelect={handleDownloadMarkdown}
+                >
+                  <Download className="h-4 w-4" />
+                  Download as .md
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Item
+                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--ink)] outline-none transition-colors hover:bg-[var(--accent-soft)] focus:bg-[var(--accent-soft)]"
+                  style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                  onSelect={handleExportPdf}
+                >
+                  <Printer className="h-4 w-4" />
+                  Export as PDF
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+
+          <button
+            onClick={handleClose}
+            className="flex h-8 w-8 items-center justify-center rounded-[var(--radius)] text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)] hover:text-[var(--ink)] cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Full-screen writing surface with title */}
       <div className="flex-1 flex justify-center px-4 sm:px-6 md:px-10 overflow-y-auto">
         <div
-          className="w-full max-w-3xl"
+          className="print-content w-full max-w-3xl"
           style={{
             paddingTop: "6vh",
           }}
         >
+          {/* Timestamp - only shown when printing/exporting, not on screen
+              (the editing view has no need for it, but the decided export
+              format is "title, timestamp, formatted content") */}
+          <p
+            className="print-only-date mb-2 hidden text-sm"
+            style={{
+              fontFamily: "var(--font-ibm-plex-mono)",
+              color: "var(--ink-soft)",
+            }}
+          >
+            {new Date(note.created_at).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </p>
+
           {/* Title input - distinct from body */}
           <input
             type="text"
@@ -510,6 +616,31 @@ export default function NotePage() {
           />
         </div>
       </div>
+
+      {/* Print/export CSS - hides everything (this page's header, save
+          status, toolbars) except the note content itself when printing,
+          regardless of the app shell/sidebar's structure. */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-content,
+          .print-content * {
+            visibility: visible;
+          }
+          .print-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding-top: 0 !important;
+          }
+          .print-only-date {
+            display: block !important;
+          }
+        }
+      `}</style>
 
       {/* Save status indicator */}
       {(saveStatus === "saving" ||
