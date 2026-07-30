@@ -9,6 +9,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { CategorizeBar } from "@/components/capture/categorize-bar";
 import { retryWithBackoff } from "@/lib/retry";
 import { pendingSavesManager } from "@/lib/pending-saves";
+import { getFiledNoteDestination } from "@/lib/note-destination";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { useCurrentUser } from "@/lib/use-current-user";
 
@@ -271,18 +272,29 @@ export default function NotePage() {
       queryClient.invalidateQueries({ queryKey: ["note", noteId] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
 
-      // Close categorize bar and navigate back
+      // Close categorize bar and navigate to wherever the note actually
+      // landed, rather than just going back to wherever we came from - gives
+      // visual confirmation the note landed somewhere.
       setShowCategorize(false);
-      router.back();
+      router.push(
+        getFiledNoteDestination({
+          type: data.type,
+          projectId: data.projectId,
+          meetingId: data.meetingId,
+          topicId: data.topicId,
+          isUnsorted: data.isUnsorted,
+        }),
+      );
     } catch (error) {
       console.error("Error categorizing note:", error);
     }
   };
 
   const handleSkipCategorize = () => {
-    // Just close the categorize bar and go back
+    // Skipping keeps the note unsorted - go there instead of just closing
+    // the categorize bar, for the same "confirm where it landed" reason.
     setShowCategorize(false);
-    router.back();
+    router.push("/unsorted");
   };
 
   const handleBackFromCategorize = () => {

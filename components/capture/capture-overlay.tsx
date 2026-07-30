@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCaptureOverlay } from "@/lib/capture-context";
 import { saveDraft, clearDraft } from "@/lib/draft-storage";
 import { generateNoteId, retryWithBackoff } from "@/lib/retry";
 import { pendingSavesManager } from "@/lib/pending-saves";
+import { getFiledNoteDestination } from "@/lib/note-destination";
 import { CategorizeBar } from "./categorize-bar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
@@ -30,6 +32,7 @@ import { useCurrentUser } from "@/lib/use-current-user";
 export function CaptureOverlay() {
   const { isOpen, initialText, initialId, prefilledContext, closeCapture } =
     useCaptureOverlay();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: currentUser } = useCurrentUser();
   const [noteId, setNoteId] = useState<string>("");
@@ -44,6 +47,10 @@ export function CaptureOverlay() {
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initializedRef = useRef(false);
   const lastSavedTextRef = useRef<string>(""); // Track what text was last saved to server
+  // Where to navigate once the save actually succeeds (including a delayed
+  // background retry) - null means stay put, e.g. saving directly into the
+  // meeting/topic whose page prompted this capture in the first place.
+  const pendingDestinationRef = useRef<string | null>(null);
 
   // NEW: Save with prefilled context (skip categorize bar)
   // Defined early so it can be used in useEffect hooks
@@ -53,6 +60,10 @@ export function CaptureOverlay() {
       return;
     }
 
+    // Prefilled context means this capture started from the meeting/topic's
+    // own page (e.g. "+ Add note to this meeting") - already viewing the
+    // destination, so there's nowhere to navigate to.
+    pendingDestinationRef.current = null;
     setSaveStatus("saving");
 
     try {
@@ -193,6 +204,9 @@ export function CaptureOverlay() {
             queryClient.invalidateQueries({ queryKey: ["notes"] });
             queryClient.invalidateQueries({ queryKey: ["note-counts"] });
             closeCapture();
+            if (pendingDestinationRef.current) {
+              router.push(pendingDestinationRef.current);
+            }
           } else {
             // User typed more after save - keep overlay open but update UI
             queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -204,7 +218,7 @@ export function CaptureOverlay() {
     });
 
     return unsubscribe;
-  }, [noteId, text, queryClient, closeCapture, currentUser?.id]);
+  }, [noteId, text, queryClient, closeCapture, currentUser?.id, router]);
 
   // Extract the finish logic so it can be called from both keyboard shortcut and button
   const handleFinish = useCallback(() => {
@@ -325,15 +339,23 @@ export function CaptureOverlay() {
       setTitle(data.title);
     }
 
+    // If categorization is incomplete (e.g., offline), treat as unsorted
+    const shouldBeUnsorted =
+      data.isUnsorted ||
+      (data.type === "meeting" && !data.meetingId) ||
+      (data.type === "general" && !data.topicId);
+
+    pendingDestinationRef.current = getFiledNoteDestination({
+      type: data.type,
+      projectId: data.projectId,
+      meetingId: data.meetingId,
+      topicId: data.topicId,
+      isUnsorted: shouldBeUnsorted,
+    });
+
     setSaveStatus("saving");
 
     try {
-      // If categorization is incomplete (e.g., offline), treat as unsorted
-      const shouldBeUnsorted =
-        data.isUnsorted ||
-        (data.type === "meeting" && !data.meetingId) ||
-        (data.type === "general" && !data.topicId);
-
       // Attempt save with automatic retry (3 attempts with exponential backoff)
       await retryWithBackoff(
         async () => {
@@ -378,17 +400,14 @@ export function CaptureOverlay() {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
       closeCapture();
+      if (pendingDestinationRef.current) {
+        router.push(pendingDestinationRef.current);
+      }
     } catch (error) {
       // All retries failed - add to pending queue for background retry
       console.error("Failed to save note after retries:", error);
       setSaveStatus("failed");
       setSaveError(error instanceof Error ? error.message : "Unknown error");
-
-      // Use the same validation: if categorization is incomplete, mark as unsorted
-      const shouldBeUnsorted =
-        data.isUnsorted ||
-        (data.type === "meeting" && !data.meetingId) ||
-        (data.type === "general" && !data.topicId);
 
       const textToSave = text.trim();
       lastSavedTextRef.current = textToSave;
@@ -417,6 +436,7 @@ export function CaptureOverlay() {
       return;
     }
 
+    pendingDestinationRef.current = "/unsorted";
     setSaveStatus("saving");
 
     try {
@@ -461,6 +481,7 @@ export function CaptureOverlay() {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       queryClient.invalidateQueries({ queryKey: ["note-counts"] });
       closeCapture();
+      router.push("/unsorted");
     } catch (error) {
       // All retries failed - add to pending queue for background retry
       console.error("Failed to save note after retries:", error);
