@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Kbd } from "@/components/ui/kbd";
@@ -476,11 +476,14 @@ export function InteractiveDemo() {
           </button>
         </div>
 
-        {/* Main demo area: sidebar + content */}
-        <div className="flex" style={{ height: "500px" }}>
+        {/* Main demo area: sidebar + content. Stacked on narrow viewports
+            (fixed-width sidebar + flex-1 content squeezed the content pane
+            to near-nothing below md) - sidebar gets a capped height on
+            mobile instead of sharing the row with content. */}
+        <div className="flex flex-col md:flex-row" style={{ height: "500px" }}>
           {/* Sidebar */}
           <div
-            className="w-56 border-r border-[var(--line)] bg-[var(--paper)] overflow-y-auto"
+            className="w-full md:w-56 flex-shrink-0 max-h-40 md:max-h-none border-b md:border-b-0 md:border-r border-[var(--line)] bg-[var(--paper)] overflow-y-auto"
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
           >
             <nav className="p-4 space-y-4">
@@ -531,7 +534,7 @@ export function InteractiveDemo() {
                         <div key={project.id}>
                           {/* Project name */}
                           <button className="w-full flex items-center gap-2 px-3 py-1 text-left">
-                            <span className="text-sm">▼</span>
+                            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 rotate-90 text-[var(--ink-soft)]" />
                             <span className="text-sm font-medium text-[var(--ink)]">
                               {project.name}
                             </span>
@@ -644,7 +647,7 @@ export function InteractiveDemo() {
           </div>
 
           {/* Main content area */}
-          <div className="flex-1 overflow-y-auto relative">
+          <div className="flex-1 min-w-0 min-h-0 overflow-y-auto relative">
             <div className="p-6">
               {activeMeetingId ? (
                 <div>

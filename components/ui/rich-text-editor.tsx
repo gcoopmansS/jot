@@ -644,6 +644,10 @@ export function RichTextEditor({
           margin-top: 12px;
           margin-bottom: 12px;
           overflow-x: auto;
+          /* Without this, some browsers fail to paint the table's content
+             until a scroll event fires on this container, leaving it blank
+             on first render whenever the table is wider than its wrapper. */
+          transform: translateZ(0);
         }
 
         .rich-text-editor .ProseMirror table {

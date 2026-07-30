@@ -37,7 +37,7 @@ const sourceSerif4 = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Jot - Capture first, organize later",
+  title: "Jot - Capture first, file later",
   description: "Low-friction note-taking for busy professionals",
   manifest: "/manifest.json",
 };

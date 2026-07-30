@@ -77,8 +77,7 @@ export default async function LandingPage() {
           Traditional note-taking tools make you organize <em>before</em> you
           write. Jot flips that:{" "}
           <strong>
-            capture first, categorize after — and categorizing is always
-            optional.
+            capture first, file after — and filing is always optional.
           </strong>
         </p>
         <Link
@@ -163,7 +162,7 @@ export default async function LandingPage() {
               className="text-lg font-semibold text-[var(--ink)] mb-3"
               style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
             >
-              3. Categorize later (or never)
+              3. File later (or never)
             </h4>
             <p
               className="text-[var(--ink-soft)] text-sm leading-relaxed"
@@ -295,8 +294,11 @@ export default async function LandingPage() {
         >
           How is Jot different?
         </h3>
-        <div className="bg-[var(--paper-raised)] rounded-[var(--radius)] border border-[var(--line)] overflow-hidden">
-          <table className="w-full">
+        <div
+          className="bg-[var(--paper-raised)] rounded-[var(--radius)] border border-[var(--line)] overflow-x-auto"
+          style={{ transform: "translateZ(0)" }}
+        >
+          <table className="w-full min-w-[560px]">
             <thead>
               <tr className="border-b border-[var(--line)]">
                 <th
