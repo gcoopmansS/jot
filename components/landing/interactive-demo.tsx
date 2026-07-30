@@ -468,7 +468,7 @@ export function InteractiveDemo() {
           </h2>
           <button
             onClick={handleNewNote}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] hover:bg-[var(--accent)] transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] hover:bg-[var(--accent)] transition-colors text-sm font-medium cursor-pointer"
             style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
           >
             <Plus className="h-4 w-4" />
@@ -490,7 +490,7 @@ export function InteractiveDemo() {
               {/* Unsorted */}
               {unsortedNotes.length > 0 && (
                 <div>
-                  <button className="w-full flex items-center justify-between px-3 py-2 rounded hover:bg-[var(--paper-raised)] transition-colors text-left">
+                  <button className="w-full flex items-center justify-between px-3 py-2 rounded hover:bg-[var(--paper-raised)] transition-colors text-left cursor-pointer">
                     <span className="text-sm text-[var(--ink)]">Unsorted</span>
                     <Badge variant="count">{unsortedNotes.length}</Badge>
                   </button>
@@ -533,7 +533,7 @@ export function InteractiveDemo() {
                       return (
                         <div key={project.id}>
                           {/* Project name */}
-                          <button className="w-full flex items-center gap-2 px-3 py-1 text-left">
+                          <button className="w-full flex items-center gap-2 px-3 py-1 text-left cursor-pointer">
                             <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 rotate-90 text-[var(--ink-soft)]" />
                             <span className="text-sm font-medium text-[var(--ink)]">
                               {project.name}
@@ -567,7 +567,7 @@ export function InteractiveDemo() {
                                         setActiveMeetingId(meeting.id);
                                         setActiveTopicId(undefined);
                                       }}
-                                      className={`w-full flex items-center justify-between px-6 py-2 rounded transition-colors text-left ${
+                                      className={`w-full flex items-center justify-between px-6 py-2 rounded transition-colors text-left cursor-pointer ${
                                         isActive
                                           ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                                           : "hover:bg-[var(--paper-raised)] text-[var(--ink)]"
@@ -612,7 +612,7 @@ export function InteractiveDemo() {
                                         setActiveTopicId(topic.id);
                                         setActiveMeetingId(undefined);
                                       }}
-                                      className={`w-full flex items-center justify-between px-6 py-2 rounded transition-colors text-left ${
+                                      className={`w-full flex items-center justify-between px-6 py-2 rounded transition-colors text-left cursor-pointer ${
                                         isActive
                                           ? "bg-[var(--purple-soft)] text-[var(--purple)]"
                                           : "hover:bg-[var(--paper-raised)] text-[var(--ink)]"
@@ -833,7 +833,7 @@ export function InteractiveDemo() {
             {/* Close button */}
             <button
               onClick={handleCancelCapture}
-              className="absolute top-4 right-4 text-2xl text-[var(--ink-soft)] hover:bg-[var(--paper)] rounded-[var(--radius)] w-10 h-10 flex items-center justify-center transition-colors z-10"
+              className="absolute top-4 right-4 text-2xl text-[var(--ink-soft)] hover:bg-[var(--paper)] rounded-[var(--radius)] w-10 h-10 flex items-center justify-center transition-colors z-10 cursor-pointer"
               aria-label="Close"
             >
               ×
@@ -895,7 +895,7 @@ export function InteractiveDemo() {
                       </h3>
                       <button
                         onClick={handleBackToEditing}
-                        className="text-[var(--ink-soft)] hover:text-[var(--ink)] text-xs underline"
+                        className="text-[var(--ink-soft)] hover:text-[var(--ink)] text-xs underline cursor-pointer"
                         style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                       >
                         Back to editing
@@ -932,7 +932,7 @@ export function InteractiveDemo() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => setNoteType("meeting")}
-                            className={`flex-1 py-2 px-3 text-sm rounded-[var(--radius)] font-medium transition-colors ${
+                            className={`flex-1 py-2 px-3 text-sm rounded-[var(--radius)] font-medium transition-colors cursor-pointer ${
                               noteType === "meeting"
                                 ? "bg-[var(--accent)] text-white"
                                 : "bg-[var(--paper)] border border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)]"
@@ -943,7 +943,7 @@ export function InteractiveDemo() {
                           </button>
                           <button
                             onClick={() => setNoteType("general")}
-                            className={`flex-1 py-2 px-3 text-sm rounded-[var(--radius)] font-medium transition-colors ${
+                            className={`flex-1 py-2 px-3 text-sm rounded-[var(--radius)] font-medium transition-colors cursor-pointer ${
                               noteType === "general"
                                 ? "bg-[var(--purple)] text-white"
                                 : "bg-[var(--paper)] border border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--purple)]"
@@ -1027,7 +1027,7 @@ export function InteractiveDemo() {
                         </Button>
                         <button
                           onClick={handleSkipCategorize}
-                          className="text-[var(--ink-soft)] hover:text-[var(--ink)] text-xs underline"
+                          className="text-[var(--ink-soft)] hover:text-[var(--ink)] text-xs underline cursor-pointer"
                           style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
                         >
                           Keep in Unsorted
