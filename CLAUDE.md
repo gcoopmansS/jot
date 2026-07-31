@@ -150,7 +150,7 @@ recurring exemption applies here, since Topics never have that concept).
 ```sql
 create table projects (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
+  user_id uuid references auth.users not null,  -- the owner-of-record; see membership note below
   name text not null,
   created_at timestamp with time zone default now()
 );
@@ -185,6 +185,25 @@ create table notes (
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+-- Foundation for Team/shared Projects (see jot-analysis/TODO.md). Every project's owner is
+-- also inserted here as "member #1" via a trigger on projects insert - membership, not
+-- projects.user_id, is what every RLS policy now actually checks against.
+create table project_members (
+  project_id uuid references projects not null,
+  user_id uuid references auth.users not null,
+  joined_at timestamp with time zone default now(),
+  primary key (project_id, user_id)
+);
+
+-- Public mirror of auth.users.email, kept in sync by trigger. Needed because the RLS-constrained
+-- client can't query auth.users directly - used to resolve a user_id to an email for member
+-- lists/author attribution (not yet built - see TODO) and invite-acceptance email matching.
+create table profiles (
+  id uuid primary key references auth.users(id),
+  email text not null,
+  created_at timestamp with time zone default now()
+);
 ```
 
 Notes:
@@ -200,9 +219,16 @@ Notes:
 - `text` is markdown. Card previews and snippets must strip markdown formatting characters (no
   visible `**`, `#`, `-`) — reuse one shared stripping function, don't reimplement it per view.
 
-**Row Level Security:** must exist — a user can only see/edit rows where `user_id` matches their
-own auth id, on every table. Re-verify this directly in the Supabase dashboard rather than assuming
-it's already correctly configured.
+**Row Level Security — membership-based, not a raw `user_id` match (changed 2026-07-30 as the
+foundation for Team/shared Projects).** For `projects`/`meetings`/`note_topics`/`notes`: viewing
+any row requires the current user to have a `project_members` row for that project (checked via
+the `is_project_member(project_id)` helper function); editing/deleting a **note's** text is
+additionally restricted to that note's original author (`notes.user_id`), while everything else
+(meetings, topics, and inserting/deleting notes) is symmetric across any member. `projects` itself
+stays owner-only for UPDATE/DELETE (`user_id = auth.uid()`, unchanged). Unsorted notes
+(`is_unsorted = true`) are untouched by any of this — always private to their own `user_id`, never
+routed through project membership at all, since they don't belong to a project. Re-verify this
+directly in the Supabase dashboard rather than assuming it's already correctly configured.
 
 ---
 

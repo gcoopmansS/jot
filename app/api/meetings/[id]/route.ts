@@ -42,15 +42,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
-    // Verify the project belongs to the user
-    const { data: project } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("id", meeting.project_id)
+    // Verify the current user is a member of the meeting's project
+    // (any member can edit a meeting's details, not just the owner)
+    const { data: membership } = await supabase
+      .from("project_members")
+      .select("project_id")
+      .eq("project_id", meeting.project_id)
       .eq("user_id", user.id)
       .single();
 
-    if (!project) {
+    if (!membership) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 

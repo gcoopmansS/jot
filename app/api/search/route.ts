@@ -40,8 +40,10 @@ export async function GET(request: NextRequest) {
     // Build the ILIKE pattern for partial matching
     const searchPattern = `%${query.trim()}%`;
 
-    // Query all user's notes with LEFT JOINs to get project, meeting, and topic names
-    // We'll filter in JavaScript since Supabase's nested OR filters are complex
+    // Query every note visible to this user (their own unsorted notes, plus
+    // any note in a project they're a member of - RLS does the filtering)
+    // with LEFT JOINs to get project, meeting, and topic names. We'll
+    // filter in JavaScript since Supabase's nested OR filters are complex.
     const { data: notes, error } = await supabase
       .from("notes")
       .select(
@@ -65,7 +67,6 @@ export async function GET(request: NextRequest) {
         )
       `,
       )
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {

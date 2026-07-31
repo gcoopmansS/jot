@@ -4,7 +4,11 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 /**
  * GET /api/projects
  *
- * Retrieves all projects for the current user.
+ * Retrieves all projects the current user is a member of (this includes
+ * projects they own - ownership implies membership - and any shared
+ * projects they've been added to). RLS does the actual filtering; no
+ * explicit user_id filter here since a project has no single owner column
+ * that captures "who can see this" anymore.
  */
 export async function GET() {
   try {
@@ -20,7 +24,6 @@ export async function GET() {
     const { data, error } = await supabase
       .from("projects")
       .select("*")
-      .eq("user_id", user.id)
       .order("name");
 
     if (error) {

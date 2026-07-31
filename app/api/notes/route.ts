@@ -122,11 +122,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Build query
+    // Build query - RLS returns unsorted notes the user authored plus any
+    // note in a project they're a member of, so no explicit user_id filter.
     let query = supabase
       .from("notes")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     // Apply filters from query params

@@ -22,12 +22,11 @@ export async function GET(
 
     const { id } = await params;
 
-    // Fetch the project, but only if it belongs to the current user
+    // Fetch the project - RLS only returns it if the user is a member
     const { data, error } = await supabase
       .from("projects")
       .select("*")
       .eq("id", id)
-      .eq("user_id", user.id)
       .single();
 
     if (error) {

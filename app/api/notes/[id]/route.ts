@@ -22,12 +22,12 @@ export async function GET(
 
     const { id } = await params;
 
-    // Fetch the note
+    // Fetch the note - RLS returns it if this is the user's own unsorted
+    // note, or any note in a project they're a member of
     const { data, error } = await supabase
       .from("notes")
       .select("*")
       .eq("id", id)
-      .eq("user_id", user.id)
       .single();
 
     if (error) {
@@ -79,6 +79,9 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
+    // Editing a note (text or categorization) is restricted to its
+    // original author, even for a shared project - that's why this route
+    // keeps an explicit user_id filter below while GET/DELETE don't.
     // Build update object with only provided fields
     const updates: any = {
       updated_at: new Date().toISOString(),
@@ -201,12 +204,14 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // First, fetch the note to capture its meeting_id/topic_id before deletion
+    // First, fetch the note to capture its meeting_id/topic_id before
+    // deletion. Deleting a note is symmetric - any project member can
+    // delete any note, not just its author - so RLS (not a user_id filter)
+    // is what determines whether this note is reachable at all.
     const { data: noteToDelete, error: fetchError } = await supabase
       .from("notes")
       .select("meeting_id, topic_id, type")
       .eq("id", id)
-      .eq("user_id", user.id)
       .single();
 
     if (fetchError || !noteToDelete) {
@@ -223,8 +228,7 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from("notes")
       .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("id", id);
 
     if (deleteError) {
       console.error("Error deleting note:", deleteError);
