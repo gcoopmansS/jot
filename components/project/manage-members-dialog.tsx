@@ -38,6 +38,9 @@ export function ManageMembersDialog({
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [justInvitedEmail, setJustInvitedEmail] = useState<string | null>(null);
+  const [justInvitedAccountExists, setJustInvitedAccountExists] = useState<
+    boolean | null
+  >(null);
   const [removeTarget, setRemoveTarget] = useState<ProjectMemberWithEmail | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<ProjectInvite | null>(null);
 
@@ -100,7 +103,11 @@ export function ManageMembersDialog({
       queryClient.invalidateQueries({ queryKey: ["project-invites", project.id] });
       await handleCopyLink(body.token);
       setJustInvitedEmail(invitedEmail);
-      setTimeout(() => setJustInvitedEmail(null), 6000);
+      setJustInvitedAccountExists(!!body.account_exists);
+      setTimeout(() => {
+        setJustInvitedEmail(null);
+        setJustInvitedAccountExists(null);
+      }, 6000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -235,14 +242,21 @@ export function ManageMembersDialog({
                     <p className="mt-2 text-xs text-red-600">{inviteError}</p>
                   )}
                   {justInvitedEmail && (
-                    <p
-                      className="mt-2 flex items-center gap-1.5 text-xs"
-                      style={{ color: "var(--accent)" }}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Link copied — paste it somewhere and send it to{" "}
-                      {justInvitedEmail}.
-                    </p>
+                    <div className="mt-2 text-xs">
+                      <p
+                        className="flex items-center gap-1.5"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Link copied — paste it somewhere and send it to{" "}
+                        {justInvitedEmail}.
+                      </p>
+                      <p className="mt-1 text-[var(--ink-soft)]">
+                        {justInvitedAccountExists
+                          ? "This email already has a Jot account — they'll see it right in the app too, or can use the link."
+                          : "This email doesn't have a Jot account yet — they'll create one when they open the link."}
+                      </p>
+                    </div>
                   )}
                 </div>
 

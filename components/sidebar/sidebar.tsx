@@ -18,6 +18,7 @@ import {
   Trash2,
   ChevronRight,
   Users,
+  Mail,
 } from "lucide-react";
 import type { Project, Meeting, NoteTopic } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -180,6 +181,42 @@ export function Sidebar() {
       };
     },
   });
+
+  // Pending invites addressed to my own email - lets someone who already has
+  // a Jot account discover and accept an invite just by using the app, no
+  // link needed.
+  const { data: myInvites = [] } = useQuery<
+    { id: string; project_id: string; project_name: string; token: string }[]
+  >({
+    queryKey: ["my-invites", currentUser?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/invites/mine");
+      if (!response.ok) throw new Error("Failed to fetch invites");
+      return response.json();
+    },
+    enabled: !!currentUser?.id,
+  });
+
+  const [acceptingInviteId, setAcceptingInviteId] = useState<string | null>(
+    null,
+  );
+
+  const handleAcceptInvite = async (token: string, inviteId: string) => {
+    setAcceptingInviteId(inviteId);
+    try {
+      const response = await fetch(`/api/invites/${token}/accept`, {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("Failed to accept invite");
+
+      queryClient.invalidateQueries({ queryKey: ["my-invites"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    } catch (error) {
+      console.error("Failed to accept invite:", error);
+    } finally {
+      setAcceptingInviteId(null);
+    }
+  };
 
   // Mutation to create a new project
   const createProjectMutation = useMutation({
@@ -461,6 +498,46 @@ export function Sidebar() {
               <Badge variant="count">{noteCounts.total}</Badge>
             )}
           </Link>
+
+          {/* Pending invites - only shown when there's actually something to
+              act on, kept out of the way otherwise */}
+          {myInvites.length > 0 && (
+            <div className="pb-2 pt-6">
+              <h2
+                className="px-3 text-xs font-semibold uppercase tracking-wider text-[var(--ink-soft)]"
+                style={{ fontFamily: "var(--font-space-grotesk)" }}
+              >
+                Invites
+              </h2>
+              <div className="mt-1 space-y-1">
+                {myInvites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className="flex items-center justify-between gap-2 rounded-[var(--radius)] bg-[var(--accent-soft)] px-3 py-2 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Mail className="h-4 w-4 flex-shrink-0 text-[var(--ink-soft)]" />
+                      <span
+                        className="truncate"
+                        style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+                      >
+                        Join {invite.project_name}
+                      </span>
+                    </span>
+                    <button
+                      onClick={() =>
+                        handleAcceptInvite(invite.token, invite.id)
+                      }
+                      disabled={acceptingInviteId === invite.id}
+                      className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline disabled:opacity-50"
+                    >
+                      {acceptingInviteId === invite.id ? "Joining..." : "Join"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Recurring meetings section */}
           <div className="pb-2 pt-6">

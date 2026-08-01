@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 /**
  * GET /api/projects/[id]/invites
@@ -97,6 +98,19 @@ export async function POST(
 
     const email = body.email.trim().toLowerCase();
 
+    // Does this email already have a Jot account? A plain session-client
+    // lookup can't answer this via RLS (the owner isn't a co-member of the
+    // invitee yet, by definition, before they've joined) - the admin client
+    // is the narrow, deliberate exception here, checking existence only,
+    // nothing else about the account.
+    const admin = createAdminClient();
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+    const accountExists = !!existingProfile;
+
     // Reuse an existing pending invite for the same email instead of
     // stacking duplicates.
     const { data: existing } = await supabase
@@ -108,7 +122,10 @@ export async function POST(
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json(existing, { status: 200 });
+      return NextResponse.json(
+        { ...existing, account_exists: accountExists },
+        { status: 200 },
+      );
     }
 
     const { data, error } = await supabase
@@ -129,7 +146,10 @@ export async function POST(
       );
     }
 
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json(
+      { ...data, account_exists: accountExists },
+      { status: 201 },
+    );
   } catch (error) {
     console.error("Unexpected error:", error);
     return NextResponse.json(
