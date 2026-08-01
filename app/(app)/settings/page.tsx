@@ -25,6 +25,9 @@ export default function SettingsPage() {
   const supabase = createClient();
   const queryClient = useQueryClient();
 
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
   // Email update state
   const [currentEmail, setCurrentEmail] = useState<string>("");
   const [newEmail, setNewEmail] = useState("");
@@ -252,6 +255,35 @@ export default function SettingsPage() {
       });
     } finally {
       setIsUpdatingPassword(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    setIsExporting(true);
+    setExportError(null);
+
+    try {
+      const response = await fetch("/api/account/export");
+      if (!response.ok) {
+        throw new Error("Failed to export data");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `jot-export-${dateStamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : "Something went wrong",
+      );
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -534,6 +566,45 @@ export default function SettingsPage() {
               {isUpdatingPassword ? "Updating..." : "Update Password"}
             </Button>
           </form>
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <div className="rounded-[var(--radius)] border border-[var(--line)] bg-[var(--paper-raised)] p-6">
+          <h2
+            className="text-xl font-semibold text-[var(--ink)]"
+            style={{ fontFamily: "var(--font-space-grotesk)" }}
+          >
+            Export Your Data
+          </h2>
+          <p
+            className="mt-1 text-sm text-[var(--ink-soft)]"
+            style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+          >
+            Download everything you own or have written — all your Projects,
+            Meetings, Topics, and notes (including notes you&apos;ve filed
+            into a shared Project someone else owns) — as a single JSON
+            file. A trust safety-net independent of Jot&apos;s own
+            reliability, and useful if you ever want a portable copy of your
+            data.
+          </p>
+
+          {exportError && (
+            <div
+              className="mt-4 rounded-[var(--radius)] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
+            >
+              {exportError}
+            </div>
+          )}
+
+          <Button
+            onClick={handleExportData}
+            disabled={isExporting}
+            className="mt-4"
+          >
+            {isExporting ? "Preparing download..." : "Download my data"}
+          </Button>
         </div>
       </section>
 

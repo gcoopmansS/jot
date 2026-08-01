@@ -40,7 +40,7 @@ export function CaptureOverlay() {
   const [title, setTitle] = useState("");
   const [showCategorize, setShowCategorize] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "failed" | "retrying"
+    "idle" | "saving" | "saved" | "failed" | "retrying" | "forbidden"
   >("idle");
   const [saveError, setSaveError] = useState<string>("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -603,7 +603,8 @@ export function CaptureOverlay() {
             {/* Save status indicator */}
             {(saveStatus === "saving" ||
               saveStatus === "retrying" ||
-              saveStatus === "failed") && (
+              saveStatus === "failed" ||
+              saveStatus === "forbidden") && (
               <div className="border-t border-[var(--line)] bg-[var(--paper)] px-4 sm:px-6 md:px-10 py-4">
                 <div
                   className="flex items-center justify-between text-sm"
@@ -632,8 +633,13 @@ export function CaptureOverlay() {
                         </span>
                       </div>
                     )}
+                    {saveStatus === "forbidden" && (
+                      <span style={{ color: "#dc2626" }}>
+                        ⚠️ {saveError || "Couldn't save this note."}
+                      </span>
+                    )}
                   </div>
-                  {saveStatus === "failed" && (
+                  {(saveStatus === "failed" || saveStatus === "forbidden") && (
                     <button
                       onClick={closeCapture}
                       className="text-sm text-[var(--ink-soft)] underline transition-colors hover:text-[var(--ink)]"
@@ -667,7 +673,8 @@ export function CaptureOverlay() {
             showCategorize &&
             saveStatus !== "saving" &&
             saveStatus !== "retrying" &&
-            saveStatus !== "failed"
+            saveStatus !== "failed" &&
+            saveStatus !== "forbidden"
           }
           initialTitle={title}
           onSave={handleSave}
