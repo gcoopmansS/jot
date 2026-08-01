@@ -59,7 +59,7 @@ export function AcceptInviteButton({ token }: { token: string }) {
         onClick={handleAccept}
         disabled={loading}
         style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
-        className="w-full py-3 px-4 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium hover:bg-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-full py-3 px-4 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium hover:bg-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
       >
         {loading ? "Joining..." : "Accept invite"}
       </button>
@@ -92,7 +92,7 @@ export function SwitchAccountButton({ redirectTo }: { redirectTo: string }) {
       onClick={handleSwitch}
       disabled={loading}
       style={{ fontFamily: "var(--font-ibm-plex-sans)" }}
-      className="w-full py-3 px-4 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium hover:bg-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      className="w-full py-3 px-4 bg-[var(--ink)] text-[var(--paper)] rounded-[var(--radius)] font-medium hover:bg-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
     >
       {loading ? "Signing out..." : "Sign in as a different account"}
     </button>
