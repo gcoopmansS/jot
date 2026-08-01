@@ -82,6 +82,32 @@ export async function PATCH(
     // Editing a note (text or categorization) is restricted to its
     // original author, even for a shared project - that's why this route
     // keeps an explicit user_id filter below while GET/DELETE don't.
+    //
+    // Check existence and authorship up front, distinctly, so a non-author
+    // member gets a clear "you can't edit this" (403) rather than a generic
+    // failure that the client would otherwise treat as a retryable network
+    // error. RLS's view policy still lets them SELECT the note (any member
+    // can view), so this fetch itself isn't blocked - only the update is.
+    const { data: existingNote, error: existingNoteError } = await supabase
+      .from("notes")
+      .select("user_id")
+      .eq("id", id)
+      .single();
+
+    if (existingNoteError || !existingNote) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
+
+    if (existingNote.user_id !== user.id) {
+      return NextResponse.json(
+        {
+          error: "Only the original author can edit this note.",
+          code: "NOT_AUTHOR",
+        },
+        { status: 403 },
+      );
+    }
+
     // Build update object with only provided fields
     const updates: any = {
       updated_at: new Date().toISOString(),

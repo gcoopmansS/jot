@@ -17,6 +17,7 @@ import {
   Pencil,
   Trash2,
   ChevronRight,
+  Users,
 } from "lucide-react";
 import type { Project, Meeting, NoteTopic } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ManageMembersDialog } from "@/components/project/manage-members-dialog";
 import { cn } from "@/lib/utils";
 import { clearAllDrafts } from "@/lib/draft-storage";
 import { useCurrentUser } from "@/lib/use-current-user";
@@ -58,6 +60,8 @@ export function Sidebar() {
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(
     null,
   );
+  const [membersDialogProject, setMembersDialogProject] =
+    useState<Project | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   // Always start "open" so the server render and the client's first render
   // match exactly (the server has no window to check viewport width against,
@@ -661,27 +665,44 @@ export function Sidebar() {
                                   style={{
                                     fontFamily: "var(--font-ibm-plex-sans)",
                                   }}
-                                  onSelect={() => {
-                                    setEditingProjectId(project.id);
-                                    setEditingProjectName(project.name);
-                                  }}
+                                  onSelect={() => setMembersDialogProject(project)}
                                 >
-                                  <Pencil className="h-4 w-4" />
-                                  Rename
+                                  <Users className="h-4 w-4" />
+                                  Members
                                 </DropdownMenu.Item>
 
-                                <DropdownMenu.Separator className="my-1 h-px bg-[var(--line)]" />
+                                {project.user_id === currentUser?.id && (
+                                  <>
+                                    <DropdownMenu.Separator className="my-1 h-px bg-[var(--line)]" />
 
-                                <DropdownMenu.Item
-                                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 outline-none transition-colors hover:bg-red-50 focus:bg-red-50"
-                                  style={{
-                                    fontFamily: "var(--font-ibm-plex-sans)",
-                                  }}
-                                  onSelect={() => handleDeleteProject(project)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete
-                                </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--ink)] outline-none transition-colors hover:bg-[var(--accent-soft)] focus:bg-[var(--accent-soft)]"
+                                      style={{
+                                        fontFamily: "var(--font-ibm-plex-sans)",
+                                      }}
+                                      onSelect={() => {
+                                        setEditingProjectId(project.id);
+                                        setEditingProjectName(project.name);
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                      Rename
+                                    </DropdownMenu.Item>
+
+                                    <DropdownMenu.Separator className="my-1 h-px bg-[var(--line)]" />
+
+                                    <DropdownMenu.Item
+                                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-red-600 outline-none transition-colors hover:bg-red-50 focus:bg-red-50"
+                                      style={{
+                                        fontFamily: "var(--font-ibm-plex-sans)",
+                                      }}
+                                      onSelect={() => handleDeleteProject(project)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      Delete
+                                    </DropdownMenu.Item>
+                                  </>
+                                )}
                               </DropdownMenu.Content>
                             </DropdownMenu.Portal>
                           </DropdownMenu.Root>
@@ -890,6 +911,14 @@ export function Sidebar() {
           onConfirm={confirmDeleteProject}
           variant="danger"
         />
+
+        {membersDialogProject && (
+          <ManageMembersDialog
+            project={membersDialogProject}
+            open={!!membersDialogProject}
+            onOpenChange={(open) => !open && setMembersDialogProject(null)}
+          />
+        )}
       </aside>
     </>
   );

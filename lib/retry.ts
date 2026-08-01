@@ -38,6 +38,13 @@ export async function retryWithBackoff<T>(
     } catch (error) {
       lastError = error as Error;
 
+      // Some failures (e.g. a permission error) can never succeed no
+      // matter how many times we retry - bail immediately instead of
+      // wasting time. The caller marks these via a `nonRetryable` flag.
+      if ((error as { nonRetryable?: boolean }).nonRetryable) {
+        throw lastError;
+      }
+
       // If this was the last attempt, throw
       if (attempt === maxAttempts) {
         throw lastError;

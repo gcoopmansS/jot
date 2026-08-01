@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase-admin";
 
 /**
  * DELETE /api/account/delete
  *
- * Permanently deletes the current user's account and ALL associated data.
- *
- * This is a complete, hard delete with no recovery possible:
- * 1. Deletes all notes (respects FK constraints to meetings/topics)
- * 2. Deletes all meetings
- * 3. Deletes all topics
- * 4. Deletes all projects
- * 5. Deletes the user account from auth.users (requires service role key)
+ * Permanently deletes the current user's account and ALL data they own:
+ * 1. Deletes every project this user owns - CASCADE takes their meetings,
+ *    topics, notes, memberships, and invites with them.
+ * 2. Any note that STILL belongs to this user at that point must be one
+ *    they authored in a project owned by someone else (their own were
+ *    just wiped in step 1) - preserve it instead of deleting: snapshot
+ *    their email, then null the user_id (a departing member's notes stay
+ *    visible to remaining members, per the same data-retention rule that
+ *    already applies to leaving/removal, see CLAUDE.md).
+ * 3. Removes their membership from any other projects they're still in.
+ * 4. Deletes the user from auth.users (requires the service role key).
  *
  * This route MUST only be called from server-side code (API routes).
  * The service role key is NEVER exposed to the browser.
  */
 export async function DELETE() {
   try {
-    // Get the current authenticated user
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
@@ -30,116 +32,63 @@ export async function DELETE() {
     }
 
     const userId = user.id;
+    const userEmail = user.email;
+    const supabaseAdmin = createAdminClient();
 
-    // Create a Supabase admin client using the service role key
-    // This is ONLY safe because this code runs server-side, never in the browser
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
+    // Step 1: delete every project this user owns. CASCADE wipes their
+    // meetings/note_topics/notes/project_members/project_invites too.
+    const { error: ownedError } = await supabaseAdmin
+      .from("projects")
+      .delete()
+      .eq("user_id", userId);
+
+    if (ownedError) {
+      console.error("Error deleting owned projects:", ownedError);
+      return NextResponse.json(
+        {
+          error: "Failed to delete owned projects. Please try again.",
+          details: ownedError.message,
         },
-      },
-    );
+        { status: 500 },
+      );
+    }
 
-    // Delete all user data in the correct order to respect foreign key constraints
-    // We wrap this in a try-catch to ensure we can report specific failures
-
-    // Step 1: Delete all notes for this user
-    // Notes reference meetings and topics, so delete notes first
-    const { error: notesError } = await supabaseAdmin
+    // Step 2: any note still bearing user_id = userId now must be one
+    // filed in someone else's project - preserve it rather than deleting.
+    const { error: preserveError } = await supabaseAdmin
       .from("notes")
+      .update({ user_id: null, author_email_snapshot: userEmail ?? null })
+      .eq("user_id", userId);
+
+    if (preserveError) {
+      console.error("Error preserving shared notes:", preserveError);
+      return NextResponse.json(
+        {
+          error: "Failed to preserve shared notes. Please try again.",
+          details: preserveError.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    // Step 3: drop membership in any remaining (other people's) projects.
+    const { error: membershipError } = await supabaseAdmin
+      .from("project_members")
       .delete()
       .eq("user_id", userId);
 
-    if (notesError) {
-      console.error("Error deleting notes:", notesError);
+    if (membershipError) {
+      console.error("Error removing memberships:", membershipError);
       return NextResponse.json(
         {
-          error: "Failed to delete notes. Please try again.",
-          details: notesError.message,
+          error: "Failed to remove project memberships. Please try again.",
+          details: membershipError.message,
         },
         { status: 500 },
       );
     }
 
-    // Step 2: Delete all meetings for this user's projects
-    // First, get all project IDs for this user
-    const { data: projects, error: projectsFetchError } = await supabaseAdmin
-      .from("projects")
-      .select("id")
-      .eq("user_id", userId);
-
-    if (projectsFetchError) {
-      console.error("Error fetching projects:", projectsFetchError);
-      return NextResponse.json(
-        {
-          error: "Failed to fetch projects. Please try again.",
-          details: projectsFetchError.message,
-        },
-        { status: 500 },
-      );
-    }
-
-    if (projects && projects.length > 0) {
-      const projectIds = projects.map((p) => p.id);
-
-      // Delete all meetings for these projects
-      const { error: meetingsError } = await supabaseAdmin
-        .from("meetings")
-        .delete()
-        .in("project_id", projectIds);
-
-      if (meetingsError) {
-        console.error("Error deleting meetings:", meetingsError);
-        return NextResponse.json(
-          {
-            error: "Failed to delete meetings. Please try again.",
-            details: meetingsError.message,
-          },
-          { status: 500 },
-        );
-      }
-
-      // Step 3: Delete all topics for these projects
-      const { error: topicsError } = await supabaseAdmin
-        .from("note_topics")
-        .delete()
-        .in("project_id", projectIds);
-
-      if (topicsError) {
-        console.error("Error deleting topics:", topicsError);
-        return NextResponse.json(
-          {
-            error: "Failed to delete topics. Please try again.",
-            details: topicsError.message,
-          },
-          { status: 500 },
-        );
-      }
-    }
-
-    // Step 4: Delete all projects for this user
-    const { error: projectsError } = await supabaseAdmin
-      .from("projects")
-      .delete()
-      .eq("user_id", userId);
-
-    if (projectsError) {
-      console.error("Error deleting projects:", projectsError);
-      return NextResponse.json(
-        {
-          error: "Failed to delete projects. Please try again.",
-          details: projectsError.message,
-        },
-        { status: 500 },
-      );
-    }
-
-    // Step 5: Delete the user account from auth.users
-    // This requires the admin client with service role key
+    // Step 4: delete the auth user itself.
     const { error: userDeleteError } =
       await supabaseAdmin.auth.admin.deleteUser(userId);
 
@@ -154,7 +103,6 @@ export async function DELETE() {
       );
     }
 
-    // Success - all data has been permanently deleted
     return NextResponse.json({
       success: true,
       message: "Account and all data permanently deleted",

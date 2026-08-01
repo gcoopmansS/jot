@@ -14,14 +14,25 @@ import Link from "next/link";
  *
  * After successful auth, users are redirected to the main app.
  *
- * Supports ?mode=sign-up URL parameter to default to sign-up mode.
+ * Supports ?mode=sign-up URL parameter to default to sign-up mode, and
+ * ?redirect=<path> to land somewhere other than "/" after signing in (used
+ * by the invite-accept flow so a visitor who has to sign in/up first ends
+ * up back on the invite page afterward).
  */
+
+// Guards against an open redirect - only ever push to a same-origin
+// relative path, never an absolute URL a malicious link could supply.
+function getSafeRedirect(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
 
 // Internal component that uses useSearchParams - must be wrapped in Suspense
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const redirectTarget = getSafeRedirect(searchParams.get("redirect"));
 
   // Track which mode we're in: sign-in or sign-up
   // Check URL parameter to determine initial mode
@@ -71,22 +82,34 @@ function AuthForm() {
 
         if (error) throw error;
 
-        // Success! Redirect to the app
-        router.push("/");
+        // Success! Redirect to the app (or wherever the caller asked for,
+        // e.g. back to an invite page)
+        router.push(redirectTarget);
         router.refresh();
       } else {
         // Create new account
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
 
         if (error) throw error;
 
-        // Supabase may require email confirmation depending on your settings
-        // For now, we'll show a success message and let them sign in
+        if (data.session) {
+          // Email confirmation is disabled for this project - signUp()
+          // already returned a live session, so proceed exactly like a
+          // successful sign-in.
+          router.push(redirectTarget);
+          router.refresh();
+          return;
+        }
+
+        // Confirmation required - they'll need to check their email, then
+        // sign in manually. Switching to the sign-in tab is a local state
+        // change, not a navigation, so `redirect` stays in the URL for
+        // whenever they do sign in below.
         setMessage(
-          "Account created! If email confirmation is enabled, please check your email. Otherwise, you can sign in now.",
+          "Account created! Please check your email, then sign in below.",
         );
         setMode("sign-in");
       }

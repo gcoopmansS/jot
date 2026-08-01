@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { X, Share, Copy, Download, Printer, Check } from "lucide-react";
+import { X, Share, Copy, Download, Printer, Check, Lock } from "lucide-react";
 import { Note } from "@/lib/types";
 import { Kbd } from "@/components/ui/kbd";
 import { CategorizeBar } from "@/components/capture/categorize-bar";
@@ -38,7 +38,7 @@ export default function NotePage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showCategorize, setShowCategorize] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "retrying" | "failed"
+    "idle" | "saving" | "saved" | "retrying" | "failed" | "forbidden"
   >("idle");
   const [saveError, setSaveError] = useState<string>("");
   const [justCopied, setJustCopied] = useState(false);
@@ -59,6 +59,13 @@ export default function NotePage() {
     },
     enabled: !!currentUser?.id,
   });
+
+  // Only the note's original author can edit it - a shared Project's other
+  // members can view and delete it, but not change its content (see
+  // CLAUDE.md's Team/shared Projects notes). A note whose author's account
+  // was since deleted (user_id nulled, see notes.author_email_snapshot) has
+  // no valid author left, so it's read-only for everyone.
+  const canEdit = !!note && !!currentUser && note.user_id === currentUser.id;
 
   // Initialize text when note loads (ONLY on first load, never from autosave refetches)
   const initialLoadRef = useRef(true);
@@ -129,6 +136,15 @@ export default function NotePage() {
         return;
       }
 
+      // Nothing legitimate to save if this viewer isn't the author -
+      // avoids both a pointless network round-trip and the confusing
+      // "unsaved changes" indicator that markdown round-tripping through
+      // the editor can spuriously trigger on initial load.
+      if (!canEdit) {
+        setHasChanges(false);
+        return;
+      }
+
       // Capture the sequence number, text, and title at save-start time
       const thisSequence = ++saveSequenceRef.current;
       const textToSave = text.trim();
@@ -149,7 +165,17 @@ export default function NotePage() {
 
             if (!response.ok) {
               const errorData = await response.json();
-              throw new Error(errorData.error || "Failed to update note");
+              const saveError = new Error(
+                errorData.error || "Failed to update note",
+              ) as Error & { nonRetryable?: boolean };
+              // A permission error (e.g. this note's author has changed, or
+              // the UI's canEdit check was somehow bypassed) can never
+              // succeed no matter how many times we retry - the editor
+              // already prevents this case, this is just a backstop.
+              if (response.status === 403) {
+                saveError.nonRetryable = true;
+              }
+              throw saveError;
             }
 
             return response.json();
@@ -194,6 +220,19 @@ export default function NotePage() {
           });
         }
       } catch (error) {
+        const isPermissionError = (error as { nonRetryable?: boolean })
+          ?.nonRetryable;
+
+        if (isPermissionError) {
+          // Can never succeed by retrying - don't queue it, just report it.
+          console.error("Cannot save - not this note's author:", error);
+          setSaveStatus("forbidden");
+          setSaveError(
+            error instanceof Error ? error.message : "You can't edit this note.",
+          );
+          return;
+        }
+
         // All retries failed - add to pending queue for background retry
         console.error("Failed to save note after retries:", error);
         setSaveStatus("failed");
@@ -218,7 +257,7 @@ export default function NotePage() {
         // Don't block the user - status indicator shows the issue
       }
     },
-    [hasChanges, text, title, noteId, note, queryClient],
+    [hasChanges, text, title, noteId, note, queryClient, canEdit],
   );
 
   // Handle close button
@@ -388,7 +427,10 @@ export default function NotePage() {
       // 1. There are unsaved changes
       // 2. We're not already in the middle of a close operation (which handles save)
       // 3. Component is unmounting due to navigation, not due to intentional close
-      if (hasChanges && !isClosingRef.current && text.trim()) {
+      // 4. This viewer is actually allowed to edit the note - otherwise there's
+      //    nothing legitimate to flush, and queueing it would just retry a
+      //    permission error forever
+      if (hasChanges && !isClosingRef.current && text.trim() && canEdit) {
         // Use the pending saves mechanism for reliable background save
         // We can't await here (component is unmounting), but pending saves
         // will retry until successful
@@ -422,14 +464,14 @@ export default function NotePage() {
         }
       }
     };
-  }, [hasChanges, text, title, noteId, note]);
+  }, [hasChanges, text, title, noteId, note, canEdit]);
 
   // Warn before leaving when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // Show warning if there are unsaved changes or save is in progress
       const hasUnsavedChanges =
-        hasChanges ||
+        (hasChanges && canEdit) ||
         saveStatus === "saving" ||
         saveStatus === "retrying" ||
         saveStatus === "failed";
@@ -442,7 +484,7 @@ export default function NotePage() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasChanges, saveStatus]);
+  }, [hasChanges, saveStatus, canEdit]);
 
   if (isLoading) {
     return (
@@ -487,11 +529,13 @@ export default function NotePage() {
             color: "var(--ink-soft)",
           }}
         >
-          {saveStatus === "failed" ? (
+          {saveStatus === "forbidden" ? (
+            <span style={{ color: "#dc2626" }}>⚠️ Can&apos;t save</span>
+          ) : saveStatus === "failed" ? (
             <span style={{ color: "var(--amber)" }}>
               ⚠️ Save failed — will retry when online
             </span>
-          ) : hasChanges ? (
+          ) : hasChanges && canEdit ? (
             <span>
               Unsaved changes ·{" "}
               <Kbd className="mr-2 hidden sm:inline-flex">esc</Kbd>{" "}
@@ -592,6 +636,21 @@ export default function NotePage() {
             })}
           </p>
 
+          {!canEdit && (
+            <p
+              className="mb-2 flex items-center gap-1.5 text-xs"
+              style={{
+                fontFamily: "var(--font-ibm-plex-mono)",
+                color: "var(--ink-soft)",
+              }}
+            >
+              <Lock className="h-3 w-3" />
+              {note.user_id
+                ? "Read-only — only the original author can edit"
+                : "Read-only — the author's account no longer exists"}
+            </p>
+          )}
+
           {/* Title input - distinct from body */}
           <input
             type="text"
@@ -601,9 +660,9 @@ export default function NotePage() {
               setHasChanges(true);
             }}
             placeholder="Untitled (optional)"
-            className="w-full mb-6 bg-transparent border-none text-3xl font-semibold text-[var(--ink)] placeholder:text-[var(--ink-soft)] focus:outline-none"
+            className="w-full mb-6 bg-transparent border-none text-3xl font-semibold text-[var(--ink)] placeholder:text-[var(--ink-soft)] focus:outline-none disabled:cursor-not-allowed"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
-            disabled={showCategorize}
+            disabled={showCategorize || !canEdit}
           />
 
           {/* Body text editor */}
@@ -611,7 +670,8 @@ export default function NotePage() {
             content={text}
             onChange={handleTextChange}
             onSave={handleClose}
-            autofocus={!showCategorize && !isLoading}
+            autofocus={!showCategorize && !isLoading && canEdit}
+            editable={canEdit}
             className="text-xl"
           />
         </div>
@@ -645,7 +705,8 @@ export default function NotePage() {
       {/* Save status indicator */}
       {(saveStatus === "saving" ||
         saveStatus === "retrying" ||
-        saveStatus === "failed") && (
+        saveStatus === "failed" ||
+        saveStatus === "forbidden") && (
         <div
           className="px-4 sm:px-6 md:px-10 py-4"
           style={{
@@ -676,6 +737,16 @@ export default function NotePage() {
                   {saveError && (
                     <span className="block">Error: {saveError}</span>
                   )}
+                </span>
+              </div>
+            )}
+            {saveStatus === "forbidden" && (
+              <div className="flex flex-col gap-1">
+                <span style={{ color: "#dc2626", fontWeight: 500 }}>
+                  ⚠️ Couldn&apos;t save
+                </span>
+                <span style={{ color: "var(--ink-soft)", fontSize: "11px" }}>
+                  {saveError || "You can't edit this note."}
                 </span>
               </div>
             )}

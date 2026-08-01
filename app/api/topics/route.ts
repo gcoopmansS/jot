@@ -21,12 +21,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const projectId = searchParams.get("project_id");
 
-    // We need to join with projects to ensure the user owns the topics
-    let query = supabase
-      .from("note_topics")
-      .select("*, projects!inner(user_id)")
-      .eq("projects.user_id", user.id)
-      .order("name");
+    // RLS (is_project_member) already limits this to topics in projects
+    // the caller is a member of.
+    let query = supabase.from("note_topics").select("*").order("name");
 
     if (projectId) {
       query = query.eq("project_id", projectId);
@@ -83,15 +80,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify the project belongs to the user
-    const { data: project } = await supabase
-      .from("projects")
-      .select("id")
-      .eq("id", body.project_id)
+    // Verify the current user is a member of the project (any member can
+    // add a topic, not just the owner)
+    const { data: membership } = await supabase
+      .from("project_members")
+      .select("project_id")
+      .eq("project_id", body.project_id)
       .eq("user_id", user.id)
       .single();
 
-    if (!project) {
+    if (!membership) {
       return NextResponse.json(
         { error: "Project not found or unauthorized" },
         { status: 404 },

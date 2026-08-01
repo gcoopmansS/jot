@@ -53,6 +53,9 @@ interface RichTextEditorProps {
   onReady?: () => void;
   /** Called when user presses Cmd+Enter (or Ctrl+Enter) to save */
   onSave?: () => void;
+  /** Whether the content can be edited (default: true). Used to make a
+   * shared-Project note read-only for everyone except its original author. */
+  editable?: boolean;
 }
 
 // Helper function to get markdown from editor
@@ -209,6 +212,7 @@ export function RichTextEditor({
   className,
   onReady,
   onSave,
+  editable = true,
 }: RichTextEditorProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
@@ -356,6 +360,7 @@ export function RichTextEditor({
         }),
       ],
       content,
+      editable,
       autofocus: autofocus ? "end" : false,
       editorProps: {
         attributes: {
@@ -404,9 +409,11 @@ export function RichTextEditor({
     [],
   );
 
-  // Update editor content when content prop changes (e.g., loading a note)
+  // Update editor content when content prop changes (e.g., loading a note).
+  // Must run regardless of editable state - a read-only note still needs
+  // its fetched content pushed in, it just can't be typed into afterward.
   useEffect(() => {
-    if (!editor || !editor.isEditable || !editor.state?.doc) return;
+    if (!editor || !editor.state?.doc) return;
 
     const currentMarkdown = getMarkdownFromEditor(editor);
     // Only update if the content is different to avoid cursor jumping
@@ -414,6 +421,13 @@ export function RichTextEditor({
       editor.commands.setContent(content);
     }
   }, [editor, content]);
+
+  // Keep the editor's editability in sync if the prop changes after mount
+  // (e.g. once we know whether the viewer is this note's author).
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(editable);
+  }, [editor, editable]);
 
   // Cleanup editor on unmount
   useEffect(() => {
@@ -440,8 +454,8 @@ export function RichTextEditor({
 
   return (
     <div ref={editorContainerRef} className={cn("rich-text-editor", className)}>
-      {editor && <BubbleMenuToolbar editor={editor} />}
-      {editor && <TableControls editor={editor} />}
+      {editor && editable && <BubbleMenuToolbar editor={editor} />}
+      {editor && editable && <TableControls editor={editor} />}
       <EditorContent editor={editor} />
       <style jsx global>{`
         /* Rich text editor styles - match the design language */

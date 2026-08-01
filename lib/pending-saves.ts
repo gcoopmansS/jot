@@ -24,7 +24,7 @@ export interface PendingSave {
 
 type SaveStatusListener = (status: {
   id: string;
-  state: "saving" | "saved" | "failed" | "retrying";
+  state: "saving" | "saved" | "failed" | "retrying" | "forbidden";
   error?: string;
 }) => void;
 
@@ -154,6 +154,22 @@ class PendingSavesManager {
         state: "saved",
       });
     } catch (error) {
+      const isPermissionError = (error as { nonRetryable?: boolean })
+        ?.nonRetryable;
+
+      if (isPermissionError) {
+        // Can never succeed no matter how many times we retry (e.g. this
+        // note's author has changed since the save was originally queued) -
+        // drop it instead of leaving it stuck retrying forever.
+        this.removePending(save.id);
+        this.notifyListeners({
+          id: save.id,
+          state: "forbidden",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        throw error;
+      }
+
       // All retries failed
       save.attemptCount++;
       this.pending.set(save.id, save);
@@ -189,7 +205,13 @@ class PendingSavesManager {
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || "Failed to save note");
+      const saveError = new Error(data.error || "Failed to save note") as Error & {
+        nonRetryable?: boolean;
+      };
+      if (response.status === 403) {
+        saveError.nonRetryable = true;
+      }
+      throw saveError;
     }
   }
 

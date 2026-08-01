@@ -67,3 +67,47 @@ export type CreateNoteInput = {
   topic_id?: string | null;
   is_unsorted?: boolean;
 };
+
+/**
+ * A user's membership in a shared Project. No role column - the project's
+ * owner is tracked separately via projects.user_id, this is a pure
+ * membership set (composite primary key: project_id + user_id).
+ */
+export type ProjectMember = {
+  project_id: string;
+  user_id: string;
+  joined_at: string;
+};
+
+/**
+ * Public mirror of auth.users.email, kept in sync by a DB trigger - needed
+ * because the RLS-constrained client can't query auth.users directly.
+ */
+export type Profile = {
+  id: string;
+  email: string;
+  created_at: string;
+};
+
+/**
+ * A pending or accepted invitation to join a shared Project.
+ */
+export type ProjectInvite = {
+  id: string;
+  project_id: string;
+  invited_email: string;
+  token: string;
+  status: "pending" | "accepted";
+  created_by: string | null;
+  created_at: string;
+};
+
+/**
+ * Returned by GET /api/projects/[id]/members - a join of project_members
+ * and profiles, not a raw table row.
+ */
+export type ProjectMemberWithEmail = {
+  user_id: string;
+  joined_at: string;
+  email: string;
+};

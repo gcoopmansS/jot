@@ -173,15 +173,21 @@ create table note_topics (
 );
 
 -- A single captured note. Exactly one of meeting_id / topic_id is set, or neither if unsorted.
+-- user_id is nullable (changed 2026-07-31): when a user deletes their account, a note they
+-- authored in a project owned by someone ELSE is preserved rather than deleted - user_id is
+-- set to null (FK is ON DELETE SET NULL) and author_email_snapshot captures who it was, so
+-- attribution survives even though the account no longer exists. This only ever happens via
+-- account deletion; a note's user_id is otherwise always set at creation and never nulled.
 create table notes (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
+  user_id uuid references auth.users on delete set null,
   text text not null,                 -- stored as plain markdown
   title text,                         -- optional, set at the top of the note itself (see Section 7)
   type text not null check (type in ('meeting', 'general')),
   meeting_id uuid references meetings,
   topic_id uuid references note_topics,
   is_unsorted boolean default false,
+  author_email_snapshot text,          -- set only when user_id above has been nulled out
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -197,11 +203,25 @@ create table project_members (
 );
 
 -- Public mirror of auth.users.email, kept in sync by trigger. Needed because the RLS-constrained
--- client can't query auth.users directly - used to resolve a user_id to an email for member
--- lists/author attribution (not yet built - see TODO) and invite-acceptance email matching.
+-- client can't query auth.users directly - used to resolve a user_id to an email for the
+-- "Manage Members" list and invite-acceptance email matching.
 create table profiles (
   id uuid primary key references auth.users(id),
   email text not null,
+  created_at timestamp with time zone default now()
+);
+
+-- Invite-a-teammate flow (Team/shared Projects). No email is ever sent by the app itself - the
+-- owner generates a link (app/invite/[token]) and shares it manually via whatever channel they
+-- like. token is what the link is built from; the accept_project_invite() RPC validates it
+-- against the accepting user's own authenticated email before creating a project_members row.
+create table project_invites (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects not null,
+  invited_email text not null,
+  token uuid not null default gen_random_uuid() unique,
+  status text not null default 'pending' check (status in ('pending', 'accepted')),
+  created_by uuid references auth.users(id),
   created_at timestamp with time zone default now()
 );
 ```
@@ -338,11 +358,15 @@ would be ambiguous with the body's own heading support.
   both the old and new address; the change only completes once required steps are done. The old
   address's email functions as a security notice.
 - Password changes require the current password.
-- **Account deletion** is a genuine hard delete: all of a user's projects/meetings/topics/notes,
-  then the auth user itself via Supabase's admin delete-user call — which **must only ever be
-  invoked from a server-side API route using the service role key**. The service role key must
-  never be imported into any client-side/browser-executed file. Deletion requires explicit,
-  effortful confirmation (not a single click) given it's irreversible.
+- **Account deletion** is a hard delete of everything the user OWNS: all of their
+  projects/meetings/topics/notes (cascade), then the auth user itself via Supabase's admin
+  delete-user call — which **must only ever be invoked from a server-side API route using the
+  service role key**. The service role key must never be imported into any client-side/
+  browser-executed file. **Exception (added for Team/shared Projects):** a note this user
+  authored in a Project owned by someone else is preserved rather than deleted — its `user_id`
+  is nulled and `author_email_snapshot` records who it was, so remaining members keep that note
+  and its attribution. Deletion requires explicit, effortful confirmation (not a single click)
+  given it's irreversible.
 - A Privacy Policy exists at `/privacy`, publicly accessible whether logged in or out, linked from
   the landing page footer, the sign-up checkbox, and Account Settings.
 

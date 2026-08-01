@@ -59,6 +59,32 @@ export async function POST(request: NextRequest) {
     const isUnsorted =
       body.is_unsorted !== undefined ? body.is_unsorted : !hasCategorization;
 
+    // This upsert doubles as the retry path for a previously-failed EDIT
+    // (see notes/[id] page - a failed PATCH gets requeued here with the
+    // note's existing id). If a note with this id already exists and isn't
+    // this user's own, this is really an unauthorized edit wearing an
+    // upsert's clothes - reject it up front with a precise, non-retryable
+    // error instead of letting RLS block the upsert generically (which the
+    // client can't distinguish from a transient failure, and would retry
+    // forever).
+    if (body.id) {
+      const { data: existingNote } = await supabase
+        .from("notes")
+        .select("user_id")
+        .eq("id", body.id)
+        .maybeSingle();
+
+      if (existingNote && existingNote.user_id !== user.id) {
+        return NextResponse.json(
+          {
+            error: "Only the original author can edit this note.",
+            code: "NOT_AUTHOR",
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     // Prepare the note data
     const noteData: Record<string, unknown> = {
       ...(body.id && { id: body.id }), // Include client ID if provided

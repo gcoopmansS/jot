@@ -591,11 +591,19 @@ export default function SettingsPage() {
               This will permanently delete your account and ALL of your data:
             </div>
             <ul className="mb-4 ml-6 list-disc space-y-1 text-sm">
-              <li>All projects</li>
+              <li>
+                All projects you own — including shared ones, removing access
+                and content for every other member in them
+              </li>
               <li>All meetings and meeting notes</li>
               <li>All topics and general notes</li>
               <li>Your account credentials</li>
             </ul>
+            <div className="mb-4 text-sm">
+              Your own notes filed in projects owned by someone else will
+              remain, attributed to your former email address, instead of
+              being deleted.
+            </div>
             <div className="mb-4 font-semibold">
               This action cannot be undone. There is no way to recover your data
               after deletion.
